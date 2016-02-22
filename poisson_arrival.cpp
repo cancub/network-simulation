@@ -8,21 +8,25 @@
 
 using namespace std;
 
-#define THRESHOLD 0.00000001
-#define EULER 2.71828
+#define THRESHOLD 0.0001
 
 class FrameGenerator {
 	public:
 		FrameGenerator();
-		FrameGenerator(double,int);
+		FrameGenerator(float,int);
 		~FrameGenerator();
+		void set_lambda(double);
+		void set_seconds(int);
 		void start();
 	private:						
-		double lambda; // average number of frames per second
+		float lambda; // average number of frames per second
 		int seconds;
+		std::vector<float> cdf, pmf;
 		std::vector<int> process_points; // the actual times of arrival
-		double pmf(int);
-		float factorial(int);
+		void obtain_statistics();
+		float get_pmf_value(int);
+		// float factorial(int);
+		// float scaled_power(double,int);
 };
 
 FrameGenerator::FrameGenerator() {
@@ -31,13 +35,17 @@ FrameGenerator::FrameGenerator() {
 	process_points.reserve(10);
 }
 
-FrameGenerator::FrameGenerator(double l, int s) {
+FrameGenerator::FrameGenerator(float l, int s) {
 	lambda = l;
 	seconds = s;
 	process_points.reserve(s*lambda -5);
 }
 
 FrameGenerator::~FrameGenerator() {}
+
+void FrameGenerator::set_seconds(int s) {seconds = s;}
+
+void FrameGenerator::set_lambda(double l) {lambda = l;}
 
 void FrameGenerator::start() {
 	/* 
@@ -47,133 +55,128 @@ void FrameGenerator::start() {
 	many arrivals. 
 	*/
 
-	std::vector<int> interval_descriptors;
-	std::vector<double> interval_arrival_times;
-	interval_descriptors.reserve(10);
-	int max_intervals = 0;
-	int total_intervals_with_k_frames, index, frames_in_interval;
-	int i = 0;
-	double p_at_k;
+	std::vector<int> interval_cdf;
+	float min;
+	int max = 0;
+	int value, test_number;
+	int frames_in_interval;
+	
+	// get the pmf and cdf for lambda
+	obtain_statistics();
 
-	for (int k = 0; k < 2*lambda; k++) {
-		// make sure that we don't keep tesing after the probability
-		// for k frames has become infinitesimal
+	interval_cdf.reserve(cdf.size());
 
-		p_at_k = pmf(k);
+	// find the minimum value in the cdf
+	min = cdf.at(0);
 
-		// find the integer number of second intervals that should have k arrivals
-		total_intervals_with_k_frames = round(p_at_k * seconds);
+	// use that minimum value to divide every value in the cdf
+	for (std::vector<float>::iterator it = cdf.begin(); it != cdf.end(); ++it) {
+		value = round(*it/min);
 
-		cout << "pmf(" << k << ") = " << p_at_k << endl;
-		cout << "total intervals over " << seconds << " = " << total_intervals_with_k_frames << endl;
-		cout << "max_intervals = " << max_intervals << ", total_intervals_with_k_frames = " << total_intervals_with_k_frames << endl;
-		usleep(500000);
+		if (value == 0)
+			value = -1;
 
-		// must find a time to stop testing. There may be 0 intervals with 0
-		// arrivals, so if the test was just for 0 intervals, it may stop right away.
-		// Instead, test the loop is on the right tail of the pmf and that 
-		// the number of intervals with this many frames is 0, since anything
-		// further to the right will have an even lower probability
+		if (value > max)
+			max = value;
 
-		if (total_intervals_with_k_frames >= max_intervals)
-			max_intervals = total_intervals_with_k_frames;
-		else if (total_intervals_with_k_frames < max_intervals && total_intervals_with_k_frames == 0) 
-			break;
-
-		std::cout << "total intervals with " << k << " frames = " << total_intervals_with_k_frames << std::endl;
-		
-		// interval descriptors will now contain a group of descriptors which
-		// represent how many times the output of the generator at an interval should be k frames 
-		for (int i = 0; i < total_intervals_with_k_frames; i++) {
-			interval_descriptors.push_back(k);
-		}
+		interval_cdf.push_back(value);
+		// cout << interval_cdf.at(interval_cdf.size() - 1) << endl;
 	}
 
-	for (int i = 0; i < interval_descriptors.size(); i++)
-		cout << interval_descriptors.at(i) << endl;
+	// process_points
+	for (int i = 0; i < seconds; i++) {
 
+		test_number = rand() % max;
 
-	// size_t size = interval_descriptors.size();
-	std::random_shuffle (interval_descriptors.begin(), interval_descriptors.end() );
-
-	for (std::vector<int>::iterator it = interval_descriptors.begin(); it != interval_descriptors.end(); it++) {
-		// select an item from interval descriptors at random
-		// to see how many frames will arrive during this second interval.
-		// make sure it was an item that was not selected before
-		// index = rand() % size;
-		// while (interval_descriptors[index] == -1) {
-		// 	index = rand() % size;
-		// }
-
-
-		// frames_in_interval = interval_descriptors[index];
-		// interval_descriptors.at(index) = -1;
-		interval_arrival_times.resize(*it);
-
-		for (int j = 0; j < *it; j++) {
-			interval_arrival_times.at(j) = rand() % 1000;
+		for (int j = 0; j < interval_cdf.size(); j++) {
+			if (test_number < interval_cdf.at(j)) {
+				frames_in_interval = j;
+				break;
+			}
 		}
 
-		std::sort(interval_arrival_times.begin(), interval_arrival_times.end());
-
-		for (int j = 0; j < *it; j++) {
-			double point_time = i*1000 + interval_arrival_times.at(j);		
-			std::cout << point_time << std::endl;
-			process_points.push_back(point_time);
+		for (int j = 0; j < frames_in_interval; j++) {
+			value = 1000000 * i + rand() % 1000000;
+			// cout << value << endl;
+			process_points.push_back(value);
 		}
-
-		i++;
-
+		// cout << j << endl;
 	}
+
+	std::sort(process_points.begin(), process_points.end());
 
 	for (int i = 0; i < process_points.size(); i++) {
-		if (i == 0) {
-			usleep(process_points.at(i)*1000);
-		}
-		else {
-			usleep((process_points.at(i)-process_points.at(i-1))*1000);
-		}
+		if (i == 0) 
+			value = process_points.at(0);
+		else
+			value = process_points.at(i) - process_points.at(i-1);
 
-		std::cout << "FRAME ARRIVAL" << std::endl;
+		usleep(value);
+
+		cout << "Frame #" << i + 1 << " sent at: " << process_points.at(i)/1000000.0 << " s" << endl;
 	}
-
-
 }
 
-double FrameGenerator::pmf(int k) {
-	float top = pow(lambda,k)*pow(EULER,-1*lambda);
-	// cout << "getting factorial, k = " << k << endl;
-	float bottom = factorial(k);
-	// cout << bottom << endl;
-	// cout << top << "/" << bottom << endl;
-	if (isinf(top) || isinf(bottom))
-		return 0;
-	else
-		return top/bottom;
+void FrameGenerator::obtain_statistics() {
+	pmf.reserve(5);
+	cdf.reserve(5);
+
+	float p_at_k = -1;
+	float max = 0;
+	float min = 1;
+	int k = 0;
+
+	while (1) {
+		// loop until we've found a value for pmf(k) that is to the right of the pmf peak
+		// and essentially 0
+
+		p_at_k = get_pmf_value(k++);
+
+		if (p_at_k > max) {
+			// this is how the code knows if it is testing the pmf to the right of the
+			// peak
+			max = p_at_k;
+		}
+		else if (p_at_k == 0 && p_at_k < max) {
+			// leave the loop, as the code is now at a zero value for pmf(k) and 
+			// it is to the right of the peak
+			break;	
+		}
+
+		pmf.push_back(p_at_k);
+
+		if (cdf.size() == 0)
+			cdf.push_back(p_at_k);
+		else
+			cdf.push_back(p_at_k + cdf.at(cdf.size()-1));
+
+		// cout << p.size() << endl;
+		// cout << "cdf[" << cdf.size()-1 << "] = " << cdf.at(cdf.size()-1) << endl;
+		// usleep(50000);
+	}
+
+	// for (int i = 0; i < pmf.size(); i++) {
+	// 	cout << pmf.at(i) << "\t\t" << cdf.at(i) << endl;
+	// }
 }
 
-float FrameGenerator::factorial(int x) {
-	float result;
-	// usleep(1000000);
-	// cout << "x = " << x << endl;
+float FrameGenerator::get_pmf_value(int k) {
+	/* 
+	Since the number of terms involving k in the denominator and numerator
+	are the same, it is simple to find pdf(k) by turning it into a 
+	series of multiplications
+	*/
 
-	if (x < 0) {
-		std::cout << "Can't peform negative factorial" << std::endl;
-	}
-	else if (x == 0) {
-		// cout << "0! = 1" << endl;
-		return 1;
-	}
-	else if (x == 1) {
-		// cout << "1! = 1" << endl;
-		return 1;
-	}
-	else {
-		result = x*factorial(x-1);
+	float result = exp(-lambda); // the e^(-lambda) term in the numerator
 
-		// cout << x << " * " << x-1 << "!" << " = " << result << endl;
-		return result;
+	for (int i = 1; i <= k; i++){
+		result *= lambda/i;
 	}
+
+	if (result < THRESHOLD)
+		result = 0;
+
+	return result;
 }
 
 int main(int argc, char *argv[]) {
