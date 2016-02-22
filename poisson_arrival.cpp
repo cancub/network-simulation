@@ -66,16 +66,27 @@ void FrameGenerator::start() {
 
 	interval_cdf.reserve(cdf.size());
 
-	// find the minimum value in the cdf
+	// get minimum value in the cdf
 	min = cdf.at(0);
 
-	// use that minimum value to divide every value in the cdf
+	/*
+	use that minimum value to divide every value in the cdf.
+	The point of this exercise is to essential make a transfer function
+	that takes as its input a uniform random variable and outputs
+	a poisson random variable. Dividing every element of the cdf by the
+	smallest value gives a vector of positive values, most of which will likely round
+	to different integer values. Note that because every number is being scaled
+	by the same amount, the relationship between each value remains the same
+	*/
 	for (std::vector<float>::iterator it = cdf.begin(); it != cdf.end(); ++it) {
 		value = round(*it/min);
 
+		// we need to ignore 0 values at the beginning of the vector, 
+		// this will be clearer in a bit
 		if (value == 0)
 			value = -1;
 
+		// find the maximum value of the vector
 		if (value > max)
 			max = value;
 
@@ -83,11 +94,30 @@ void FrameGenerator::start() {
 		// cout << interval_cdf.at(interval_cdf.size() - 1) << endl;
 	}
 
-	// process_points
+	/*
+	Here's where this setup comes together. There will be <seconds> 1 second
+	intervals for which a number of frames following the poisson process pmf
+	will arrive. To determine the number of frames that arrive each interval,
+	a random number is generated from 0 to the maximum the cdf we modified
+	above. With the index of interval_cdf still representing the number
+	of frames to arrive in an interval, we search for the first value in the new
+	cdf that is less than our (uniformly generated) random number. Because it is
+	a cdf, it is clear that 
+
+	arg max pdf[i] = arg max interval_cdf[i] - interval_cdf[i-1]
+
+	so the most likely range that the random number will fall in is the range represented
+	by i
+
+	(does that make sense?)
+	*/
 	for (int i = 0; i < seconds; i++) {
 
+		// find the test_number for the modified cdf
 		test_number = rand() % max;
 
+		// locate the first index at which the value of the augmented cdf is
+		// larger than the random number
 		for (int j = 0; j < interval_cdf.size(); j++) {
 			if (test_number < interval_cdf.at(j)) {
 				frames_in_interval = j;
@@ -95,12 +125,15 @@ void FrameGenerator::start() {
 			}
 		}
 
+		// for this second interval, generate that many frames with timing
+		// between 0 s and 1 s. In the future, it would be better to have 
+		// some recursion here to comply with the true poisson random process,
+		// since each sub interval of a poisson random process is itself
+		// a poisson random process
 		for (int j = 0; j < frames_in_interval; j++) {
 			value = 1000000 * i + rand() % 1000000;
-			// cout << value << endl;
 			process_points.push_back(value);
 		}
-		// cout << j << endl;
 	}
 
 	std::sort(process_points.begin(), process_points.end());
