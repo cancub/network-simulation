@@ -4,52 +4,30 @@
 #include <cmath>
 #include <algorithm>
 #include <unistd.h>
+#include "frame_generators.h"
 // #include <string>
 
 using namespace std;
 
-#define THRESHOLD 0.000001
-
-class FrameGenerator {
-	public:
-		FrameGenerator();
-		FrameGenerator(float,int);
-		~FrameGenerator();
-		void set_lambda(double);
-		void set_seconds(int);
-		void start();
-	private:						
-		float lambda; // average number of frames per second
-		int seconds;
-		std::vector<float> cdf, pmf;
-		std::vector<int> process_points; // the actual times of arrival
-		void obtain_statistics();
-		float get_pmf_value(int);
-		int poisson_arrivals();
-		void run_capture();
-		// float factorial(int);
-		// float scaled_power(double,int);
-};
-
-FrameGenerator::FrameGenerator() {
+Poisson::Poisson() {
 	lambda = 0;
 	seconds = 0;
 	process_points.reserve(10);
 }
 
-FrameGenerator::FrameGenerator(float l, int s) {
+Poisson::Poisson(float l, int s) {
 	lambda = l;
 	seconds = s;
 	process_points.reserve(s*lambda);
 }
 
-FrameGenerator::~FrameGenerator() {}
+Poisson::~Poisson() {}
 
-void FrameGenerator::set_seconds(int s) {seconds = s;}
+void Poisson::set_seconds(int s) {seconds = s;}
 
-void FrameGenerator::set_lambda(double l) {lambda = l;}
+void Poisson::set_lambda(double l) {lambda = l;}
 
-void FrameGenerator::start() {
+void Poisson::start() {
 	/* 
 	This function will, using the poisson distribution, determine the probability mass
 	function for the specified lambda. Knowing the probability that k arrivals occur each
@@ -103,7 +81,7 @@ void FrameGenerator::start() {
 	run_capture();
 }
 
-void FrameGenerator::obtain_statistics() {
+void Poisson::obtain_statistics() {
 	pmf.reserve(5);
 	cdf.reserve(5);
 
@@ -167,7 +145,7 @@ void FrameGenerator::obtain_statistics() {
 	// }
 }
 
-float FrameGenerator::get_pmf_value(int k) {
+float Poisson::get_pmf_value(int k) {
 	/* 
 	Since the number of terms involving k in the denominator and numerator
 	are the same, it is simple to find pdf(k) by turning it into a 
@@ -186,7 +164,7 @@ float FrameGenerator::get_pmf_value(int k) {
 	return result;
 }
 
-int FrameGenerator::poisson_arrivals() {
+int Poisson::poisson_arrivals() {
 	// find the test_number for the modified cdf
 	int result = -1;
 	float test_number = (rand() % 1000000000) / 1000000000.0;
@@ -203,7 +181,7 @@ int FrameGenerator::poisson_arrivals() {
 	return result;
 }
 
-void FrameGenerator::run_capture() {
+void Poisson::run_capture() {
 
 	float value;
 
@@ -227,7 +205,7 @@ int main(int argc, char *argv[]) {
 	// generate frame arrival time and size
 
 	if (argc == 3){
-		FrameGenerator my_frames(atoi(argv[1]),atoi(argv[2]));
+		Poisson my_frames(atoi(argv[1]),atoi(argv[2]));
 		srand (time(NULL));
 		my_frames.start();
 	}
