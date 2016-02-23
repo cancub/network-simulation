@@ -8,7 +8,7 @@
 
 using namespace std;
 
-#define THRESHOLD 0.0001
+#define THRESHOLD 0.000001
 
 class FrameGenerator {
 	public:
@@ -25,6 +25,8 @@ class FrameGenerator {
 		std::vector<int> process_points; // the actual times of arrival
 		void obtain_statistics();
 		float get_pmf_value(int);
+		int poisson_arrivals();
+		void run_capture();
 		// float factorial(int);
 		// float scaled_power(double,int);
 };
@@ -38,7 +40,7 @@ FrameGenerator::FrameGenerator() {
 FrameGenerator::FrameGenerator(float l, int s) {
 	lambda = l;
 	seconds = s;
-	process_points.reserve(s*lambda -5);
+	process_points.reserve(s*lambda);
 }
 
 FrameGenerator::~FrameGenerator() {}
@@ -57,54 +59,24 @@ void FrameGenerator::start() {
 
 	std::vector<int> interval_cdf;
 	float min;
-	int max = 0;
-	int value, test_number;
+	float max;
+	int value;
+	float test_number;
 	int frames_in_interval;
 	
 	// get the pmf and cdf for lambda
 	obtain_statistics();
 
-	interval_cdf.reserve(cdf.size());
-
-	// get minimum value in the cdf
-	min = cdf.at(0);
-
-	/*
-	use that minimum value to divide every value in the cdf.
-	The point of this exercise is to essential make a transfer function
-	that takes as its input a uniform random variable and outputs
-	a poisson random variable. Dividing every element of the cdf by the
-	smallest value gives a vector of positive values, most of which will likely round
-	to different integer values. Note that because every number is being scaled
-	by the same amount, the relationship between each value remains the same
-	*/
-	for (std::vector<float>::iterator it = cdf.begin(); it != cdf.end(); ++it) {
-		value = round(*it/min);
-
-		// we need to ignore 0 values at the beginning of the vector, 
-		// this will be clearer in a bit
-		if (value == 0)
-			value = -1;
-
-		// find the maximum value of the vector
-		if (value > max)
-			max = value;
-
-		interval_cdf.push_back(value);
-		// cout << interval_cdf.at(interval_cdf.size() - 1) << endl;
-	}
-
 	/*
 	Here's where this setup comes together. There will be <seconds> 1 second
 	intervals for which a number of frames following the poisson process pmf
 	will arrive. To determine the number of frames that arrive each interval,
-	a random number is generated from 0 to the maximum the cdf we modified
-	above. With the index of interval_cdf still representing the number
+	a random number is generated from 0 to 1. With the index of the cdf representing the number
 	of frames to arrive in an interval, we search for the first value in the new
 	cdf that is less than our (uniformly generated) random number. Because it is
 	a cdf, it is clear that 
 
-	arg max pdf[i] = arg max interval_cdf[i] - interval_cdf[i-1]
+	arg max pdf[i] = arg max cdf[i] - cdf[i-1]
 
 	so the most likely range that the random number will fall in is the range represented
 	by i
@@ -113,17 +85,7 @@ void FrameGenerator::start() {
 	*/
 	for (int i = 0; i < seconds; i++) {
 
-		// find the test_number for the modified cdf
-		test_number = rand() % max;
-
-		// locate the first index at which the value of the augmented cdf is
-		// larger than the random number
-		for (int j = 0; j < interval_cdf.size(); j++) {
-			if (test_number < interval_cdf.at(j)) {
-				frames_in_interval = j;
-				break;
-			}
-		}
+		frames_in_interval = poisson_arrivals();
 
 		// for this second interval, generate that many frames with timing
 		// between 0 s and 1 s. In the future, it would be better to have 
@@ -138,16 +100,7 @@ void FrameGenerator::start() {
 
 	std::sort(process_points.begin(), process_points.end());
 
-	for (int i = 0; i < process_points.size(); i++) {
-		if (i == 0) 
-			value = process_points.at(0);
-		else
-			value = process_points.at(i) - process_points.at(i-1);
-
-		usleep(value);
-
-		cout << "Frame #" << i + 1 << " sent at: " << process_points.at(i)/1000000.0 << " s" << endl;
-	}
+	run_capture();
 }
 
 void FrameGenerator::obtain_statistics() {
@@ -157,7 +110,10 @@ void FrameGenerator::obtain_statistics() {
 	float p_at_k = -1;
 	float max = 0;
 	float min = 1;
+	int i = 0;
+	int j = 0;
 	int k = 0;
+	int cdf_test = 0;
 
 	while (1) {
 		// loop until we've found a value for pmf(k) that is to the right of the pmf peak
@@ -183,13 +139,31 @@ void FrameGenerator::obtain_statistics() {
 		else
 			cdf.push_back(p_at_k + cdf.at(cdf.size()-1));
 
-		// cout << p.size() << endl;
+
+
+		// cout << cdf.size() << endl;
 		// cout << "cdf[" << cdf.size()-1 << "] = " << cdf.at(cdf.size()-1) << endl;
 		// usleep(50000);
 	}
 
-	// for (int i = 0; i < pmf.size(); i++) {
-	// 	cout << pmf.at(i) << "\t\t" << cdf.at(i) << endl;
+	max = cdf.at(cdf.size()-1);
+
+	// cout << cdf.size() << endl;
+
+	for (i = 0; i < cdf.size(); i++) {
+		cdf.at(i) = cdf.at(i) / max;
+		if (cdf.at(i) == 1 && cdf_test == 0)
+			cdf_test = i;
+		pmf.at(i) = pmf.at(i) / max;
+	}
+
+	for (i = cdf.size() - 1; i > cdf_test; i--)
+		cdf.pop_back();
+
+	// cout << cdf.size() << endl;
+
+	// for (i = 0; i < cdf.size(); i++) {
+	// 	cout << i << ": " << pmf.at(i) << "\t\t" << cdf.at(i) << "  : " << (cdf.at(i) == 1) << endl;
 	// }
 }
 
@@ -206,10 +180,44 @@ float FrameGenerator::get_pmf_value(int k) {
 		result *= lambda/i;
 	}
 
-	if (result < THRESHOLD)
+	if (isinf(result))
 		result = 0;
 
 	return result;
+}
+
+int FrameGenerator::poisson_arrivals() {
+	// find the test_number for the modified cdf
+	int result = -1;
+	float test_number = (rand() % 1000000000) / 1000000000.0;
+
+	// locate the first index at which the value of the augmented cdf is
+	// larger than the random number
+	for (int j = 0; j < cdf.size(); j++) {
+		if (test_number < cdf.at(j)) {
+			result = j;
+			break;
+		}
+	}
+
+	return result;
+}
+
+void FrameGenerator::run_capture() {
+
+	float value;
+
+	for (int i = 0; i < process_points.size(); i++) {
+		if (i == 0) 
+			value = process_points.at(0);
+		else
+			value = process_points.at(i) - process_points.at(i-1);
+
+		// usleep(value);
+
+		cout << "Frame #" << i + 1 << " sent at: " << process_points.at(i)/1000000.0 << " s" << endl;
+	}
+	
 }
 
 int main(int argc, char *argv[]) {
