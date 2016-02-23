@@ -181,7 +181,7 @@ void Poisson::print_capture_pmf() {
 
 	// print the normalized histogram (PMF) for this run
 	for (int i = 0; i < capture_pmf.size(); i++) {
-		cout << i << ": " << capture_pmf.at(i) << '\t' << capture_pmf.at(i) / float(seconds); << endl;
+		cout << i << ": " << capture_pmf.at(i) << '\t' << capture_pmf.at(i) / float(seconds) << endl;
 	}
 
 }
