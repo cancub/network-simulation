@@ -19,12 +19,12 @@ class Poisson {
 	private:						
 		float lambda; // average number of frames per second
 		int seconds;
-		std::vector<float> cdf, pmf;
-		std::vector<int> process_points; // the actual times of arrival
-		void obtain_statistics();
-		float get_pmf_value(int);
-		int poisson_arrivals();
+		std::vector< std::vector<float> > cdf;
+		std::vector<float> process_points; // the actual times of arrival
+		void obtain_cdf();
+		float poisson_arrival();
 		void run_capture();
+		void print_capture_pmf();
 };
 
 
