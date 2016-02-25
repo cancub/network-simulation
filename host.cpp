@@ -4,6 +4,7 @@
 #include <cmath>
 #include <algorithm>
 #include <unistd.h>
+#include <cstring>
 #include <string>
 #include "frame_generators.h"
 #include "host.h"
@@ -15,18 +16,27 @@ Host::Host() {
 	mac_addr.reserve(6);
 }
 
-Host::Host(string, string) {
-
+Host::Host(string ip_addr, string mac_addr) {
+	ip = ip_addr;
+	mac = mac_addr;
 }
 
 void Host::initialize() {}
 
 void Host::start() {}
 
-str::vector<int> Host::ip() {}
+string Host::ip() {return ip;}
 
-string Host::ip_string() {}
+string Host::mac() {return mac;}
 
-str::vector<int> Host::mac_addr() {}
+void send_frames(int seconds) {
 
-string Host::mac_addr_string() {}
+	float total_time = 0.0;
+	float arrival_time = 0.0;
+
+	do {
+		arrival_time = frame_generator.poisson_arrival();
+		total_time += arrival_time;
+		cout << "Frame sent at " << total_time << " s" << endl;
+	} while (total_time < float(seconds));
+}

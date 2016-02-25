@@ -12,13 +12,13 @@ class Host{
 		Host(string, string);
 		void initialize();
 		void start();
-		str::vector<int> ip();
-		string ip_string();
-		str::vector<int> mac_addr();
-		string mac_addr_string();
+		string ip();
+		string mac();
+		void send_frames();
 	private:
-		std::vector<int> ip;
-		std::vector<int> mac_addr;
+		Poisson frame_generator;
+		string ip;
+		string mac;
 };
 
 #endif
