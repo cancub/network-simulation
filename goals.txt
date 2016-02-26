@@ -23,3 +23,5 @@ host -- link -- switch -- link -- host
 - multicast
 - arp
 - ping
+- tcp
+- introduce error for force retransmit
