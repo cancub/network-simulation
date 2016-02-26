@@ -8,12 +8,12 @@ class Frame {
 	public:
 		Frame();
 		Frame(string, string, size_t);
-		string dst();
 		string src();
+		string dst();
 		size_t size();
 	private:
-		string destination_address;
 		string source_address;
+		string destination_address;
 		size_t size;
 };
 

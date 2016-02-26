@@ -3,12 +3,20 @@
 #include "frames.h"
 
 
-Frame::Frame() {}
+Frame::Frame() {
+	source_address = "";
+	destination_address = "";
+	size = 0;
+}
 
-Frame::Frame(string, string, size_t) {}
+Frame::Frame(string src, string dest, size_t length) {
+	source_address = src;
+	destination_address = dst;
+	size = length;
+}
 
-string Frame::dst() {}
+string Frame::src() { return source_address; }
 
-string Frame::src() {}
+string Frame::dst() { return destination_address; }
 		
-size_t Frame::size() {}
+size_t Frame::size() {return size;}
