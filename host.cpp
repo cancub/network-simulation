@@ -28,15 +28,3 @@ void Host::start() {}
 string Host::ip() {return ip;}
 
 string Host::mac() {return mac;}
-
-void send_frames(int seconds) {
-
-	float total_time = 0.0;
-	float arrival_time = 0.0;
-
-	do {
-		arrival_time = frame_generator.poisson_arrival();
-		total_time += arrival_time;
-		cout << "Frame sent at " << total_time << " s" << endl;
-	} while (total_time < float(seconds));
-}

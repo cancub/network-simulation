@@ -14,7 +14,6 @@ class Host{
 		void start();
 		string ip();
 		string mac();
-		void send_frames();
 	private:
 		Poisson frame_generator;
 		string ip;
