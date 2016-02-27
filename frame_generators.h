@@ -1,13 +1,7 @@
 #ifndef FRAME_GENERATORS_H
 #define FRAME_GENERATORS_H
 
-#include <stdlib.h>
-#include <iostream>
 #include <vector>
-#include <cmath>
-#include <algorithm>
-#include <unistd.h>
-// #include <chrono>
 
 class Poisson {
 	public:
