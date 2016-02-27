@@ -36,6 +36,6 @@
 ehthumbs.db
 Thumbs.db
 
-test*
+#test*
 a.out
 *.gch

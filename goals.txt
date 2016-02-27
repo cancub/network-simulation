@@ -1,4 +1,4 @@
-host -- link -- host
+host -- link -- host (COMPLETE)
 
 host -- link -- switch -- link -- host
 
@@ -18,14 +18,8 @@ host -- link -- switch -- link -- host
 				  host
 
 - (complete) make frame sending process
-- make host which uses frame sending process
-- make link which has a mutex that two nodes can access and send frame to transmit
-- have host spawn a sending and receiving thread
-- give receiving thread location in memory of frames put on link
-- give sending thread the same location in memory and a mutex to access it
-- put frame on link and have it heard by host
-- have host put frame on link and have it heard by main function
-- communicate frame between two hosts on a link
+- (complete) make host which uses frame sending process
+- (complete) communicate frame between two hosts on a link (represented by a mutex)
 - communicate frame between two hosts seperated by a switch
 - implement routing protocols, network discovery protocols for switch to figure out ports
 - have frame sent from one specific host to another
