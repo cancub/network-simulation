@@ -4,6 +4,7 @@
 #include <iostream>
 #include <thread>
 #include <mutex>
+#include <string>
 
 /*
 Ethernet link has a mutex for use. Once the mutex has been grabbed,
@@ -26,12 +27,12 @@ class Ethernet {
 	*/
 	public:
 		Ethernet();
-		Ethernet(string, string);
+		Ethernet(std::string, std::string);
 		void run();
 	private:
 		std::mutex m;
 		std::vector<int*> interfaces(2,0);	// these are Alice and Bob's interfaces
-		std::vector<string> nodes(2,""); // the MACS of Alice and Bob
+		std::vector<std::string> nodes(2,""); // the MACS of Alice and Bob
 		int move_frame();
 };
 
