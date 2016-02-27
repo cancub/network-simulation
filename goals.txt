@@ -8,7 +8,16 @@ host -- link -- switch -- link -- host
 				   |
 				  host
 
-- make frame sending process
+				gateway
+			       |
+				   |
+host -- link -- switch -- link -- host
+				   |
+				  link
+				   |
+				  host
+
+- (complete) make frame sending process
 - make host which uses frame sending process
 - make link which has a mutex that two nodes can access and send frame to transmit
 - have host spawn a sending and receiving thread
