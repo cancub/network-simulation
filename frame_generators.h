@@ -7,22 +7,24 @@
 #include <cmath>
 #include <algorithm>
 #include <unistd.h>
+// #include <chrono>
 
 class Poisson {
 	public:
 		Poisson();
-		Poisson(float,int);
+		Poisson(int);
+		Poisson(double,int);
 		~Poisson();
 		void set_lambda(double);
 		void set_seconds(int);
 		void start();
-		float poisson_arrival();
+		double interarrival_time();
 	private:						
-		float lambda; // average number of frames per second
+		double lambda; // average number of frames per second
 		int seconds;
-		std::vector< std::vector<float> > cdf;
-		std::vector<float> process_points; // the actual times of arrival
-		void obtain_cdf();
+		std::vector< std::vector<double> > cdf;
+		std::vector<double> process_points; // the actual times of arrival
+		void build_cdf();
 		void run_capture();
 		void print_capture_pmf();
 };

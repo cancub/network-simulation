@@ -4,6 +4,7 @@
 #include <cmath>
 #include <algorithm>
 #include <unistd.h>
+// #include <chrono>
 #include "frame_generators.h"
 // #include <string>
 
@@ -17,17 +18,28 @@ Poisson::Poisson() {
 	process_points.reserve(10);
 }
 
-Poisson::Poisson(float l, int s) {
+Poisson::Poisson(int l) {
+	lambda = l;
+	seconds = 0;
+	process_points.reserve(10);
+	build_cdf();
+}
+
+Poisson::Poisson(double l, int s) {
 	lambda = l;
 	seconds = s;
 	process_points.reserve(s*lambda);
+	build_cdf();
 }
 
 Poisson::~Poisson() {}
 
 void Poisson::set_seconds(int s) {seconds = s;}
 
-void Poisson::set_lambda(double l) {lambda = l;}
+void Poisson::set_lambda(double l) {
+	lambda = l;
+	build_cdf();
+}
 
 void Poisson::start() {
 	/* 
@@ -36,15 +48,15 @@ void Poisson::start() {
 	seconds parameter
 	*/
 
-	float interarrival_t;	// the interarrival time, t = tau_i - tau_i-1
-	float total_t = 0.0;	// the total time for the process thus far, summing the interarrival times
+	double interarrival_t;	// the interarrival time, t = tau_i - tau_i-1
+	double total_t = 0.0;	// the total time for the process thus far, summing the interarrival times
 	
 	// get the cdf for the given lambda
-	obtain_cdf();	
+	build_cdf();	
 
 	while (1) {
 		// get the next interarrival time, based on the cdf we obtained
-		interarrival_t = poisson_arrival();
+		interarrival_t = interarrival_time();
 		// add that to the total time thus far
 		total_t += interarrival_t;
 		// check to see if this next point will fall outside the specified time range
@@ -63,10 +75,10 @@ void Poisson::start() {
 	print_capture_pmf();
 }
 
-void Poisson::obtain_cdf() {
+void Poisson::build_cdf() {
 
-	float increment = 0.0001;
-	float t = 0.0;
+	double increment = 0.0001;
+	double t = 0.0;
 
 	/*
 	CDF is a 2-D vector, which looks like this
@@ -74,7 +86,7 @@ void Poisson::obtain_cdf() {
 	*/
 
 	// this euqation describes the CDF for an interarrival process
-	float cdf_at_t = 1.0 - exp(-lambda*t);
+	double cdf_at_t = 1.0 - exp(-lambda*t);
 
 	// check to see if the CDF calues is within a predefined limit
 	// of being at it's maximum, 1. This is to prevent the code from
@@ -82,7 +94,7 @@ void Poisson::obtain_cdf() {
 	// unlikely to be selected
 	while (1.0 - cdf_at_t > THRESHOLD) {
 		// each row of the CDF consists of a time and a CDF value at that time
-		std::vector<float> row;
+		std::vector<double> row;
 		row.push_back(t);
 		row.push_back(cdf_at_t);
 		cdf.push_back(row);
@@ -96,10 +108,10 @@ void Poisson::obtain_cdf() {
 	cdf.at(cdf.size()-1)[1] = 1.0;
 }
 
-float Poisson::poisson_arrival() {
+double Poisson::interarrival_time() {
 	// find the test_number for the modified cdf
-	float result;
-	float test_number = (rand() % 1000000000) / 1000000000.0;
+	double result;
+	double test_number = (rand() % 1000000000) / 1000000000.0;
 
 	// locate the first index at which the value of the augmented cdf is
 	// larger than the random number. This essentially works as a conversion
@@ -116,12 +128,12 @@ float Poisson::poisson_arrival() {
 
 void Poisson::run_capture() {
 
-	float sleep_time;
-	float total_time = 0.0;
+	double sleep_time;
+	double total_time = 0.0;
 	int count = 1;
 
 	// loop through all the values of the <seconds> second process
-	for (std::vector<float>::iterator it = process_points.begin(); it != process_points.end(); ++it) {
+	for (std::vector<double>::iterator it = process_points.begin(); it != process_points.end(); ++it) {
 		// find the time that should be printed on the screen
 		total_time += *it;
 		// find the number of frames that will have been sent after this one
@@ -134,11 +146,11 @@ void Poisson::run_capture() {
 void Poisson::print_capture_pmf() {
 	int frames_in_interval = 0;	// the frames seen in a given second interval
 	int interval = 1;	// the second interval under observation
-	float total_time = 0.0;	// the time from start at a given observation
-	std::vector<float> capture_pmf(1);	// the observed pmf (histogram) of this recent running of a process
+	double total_time = 0.0;	// the time from start at a given observation
+	std::vector<double> capture_pmf(1);	// the observed pmf (histogram) of this recent running of a process
 
 	// loop through each of the arrival times in the point process
-	for (std::vector<float>::iterator it = process_points.begin(); it != process_points.end(); ++it) {
+	for (std::vector<double>::iterator it = process_points.begin(); it != process_points.end(); ++it) {
 		// add the interarrival time to the total time to know which
 		// second interval we should be in
 		total_time += *it;
@@ -146,7 +158,7 @@ void Poisson::print_capture_pmf() {
 		// if this most recent arrival occured in a new interval
 		// we need to increment the element of the pmf corresponding
 		// to how many frames we saw in the last interval
-		while (total_time > float(interval)) {
+		while (total_time > double(interval)) {
 			// there may be a need to resize the pmf if the 
 			// value of the number of frames in the last interval
 			// is greater than the current number of elements in the
@@ -181,7 +193,7 @@ void Poisson::print_capture_pmf() {
 
 	// print the normalized histogram (PMF) for this run
 	for (int i = 0; i < capture_pmf.size(); i++) {
-		cout << i << ": " << capture_pmf.at(i) << '\t' << capture_pmf.at(i) / float(seconds) << endl;
+		cout << i << ": " << capture_pmf.at(i) << '\t' << capture_pmf.at(i) / double(seconds) << endl;
 	}
 
 }
