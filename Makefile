@@ -8,4 +8,4 @@ host: host.o frame_generators.o frames.o
 	$(CXX) $(CXXFLAGS) -o host host.o frame_generators.o frames.o -I.
 
 clean:
-	rm *.o 
+	rm *.o host test
