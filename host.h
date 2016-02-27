@@ -16,6 +16,7 @@ class Host{
 		void run(std::string);
 		std::string get_ip();
 		std::string get_mac();
+		int get_frame_count();
 		void set_ip(std::string);
 		void set_mac(std::string);
 		void set_interface(Frame*);
@@ -23,12 +24,14 @@ class Host{
 	private:
 		void send_frame(int, std::string);
 		void process_frame();
+		void increment_frame_count();
 		Poisson* frame_generator;
 		Frame* interface;
 		std::string ip;
 		std::string mac;
 		std::mutex* interface_mutex;
-		double runtime;
+		std::chrono::time_point<std::chrono::high_resolution_clock> host_start_time;
+		int rx_frame_count;
 };
 
 #endif
