@@ -198,21 +198,21 @@ void Poisson::print_capture_pmf() {
 
 }
 
-int main(int argc, char *argv[]) {
-	// generate random number from a RV with poisson distribution
-	// determine proper values for standard internet traffic
-	// look up size distribution of frames
-	// generate frame arrival time and size
+// int main(int argc, char *argv[]) {
+// 	// generate random number from a RV with poisson distribution
+// 	// determine proper values for standard internet traffic
+// 	// look up size distribution of frames
+// 	// generate frame arrival time and size
 
-	if (argc == 3){
-		Poisson my_frames(atoi(argv[1]),atoi(argv[2]));
-		srand (time(NULL));
-		my_frames.start();
-	}
-	else {
-		std::cout << "Not enough arguments. Need (lambda, seconds)" << std::endl;
-	}
+// 	if (argc == 3){
+// 		Poisson my_frames(atoi(argv[1]),atoi(argv[2]));
+// 		srand (time(NULL));
+// 		my_frames.start();
+// 	}
+// 	else {
+// 		std::cout << "Not enough arguments. Need (lambda, seconds)" << std::endl;
+// 	}
 
 
-	return 0;
-}
+// 	return 0;
+// }
