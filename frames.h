@@ -21,6 +21,7 @@ class Frame {
 		void set_src_ip(std::string);
 		void set_dst_ip(std::string);
 		void set_frame_size(size_t);
+		void erase();
 	private:
 		std::string source_mac;
 		std::string destination_mac;

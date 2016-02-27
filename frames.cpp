@@ -57,3 +57,11 @@ void Frame::set_dst_ip(std::string ip) {
 void Frame::set_frame_size(size_t length) {
 	frame_size = length;
 }
+
+void Frame::erase() {
+	frame_size = 0;
+	source_mac = "";
+	source_ip = "";
+	destination_mac = "";
+	destination_ip = "";
+}
