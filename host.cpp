@@ -5,28 +5,38 @@
 #include <algorithm>
 #include <unistd.h>
 #include <string>
-#include "frame_generators.h"
-#include "frames.h"
-#include "host.h"
 #include <chrono>
 #include <typeinfo>
 
+#include "host.h"
+#include "frame_generators.h"
+#include "frames.h"
+
 using namespace std;
 
+#define POISSON 10
+
 Host::Host() {
-	ip.reserve(4);
-	mac.reserve(6);
 	rx_frame_count = 0;
+	frame_generator = new Poisson(POISSON);
 }
 
-Host::Host(std::string ip_addr, std::string mac_addr, std::mutex* if_mutex, Frame* iface) {
+Host::Host(std::string ip_addr, std::string mac_addr, std::string hostname) {
+	ip = ip_addr;
+	mac = mac_addr;
+	rx_frame_count = 0;
+	name = hostname;
+	frame_generator = new Poisson(POISSON);
+}
+
+Host::Host(std::string ip_addr, std::string mac_addr, std::string hostname, std::mutex* if_mutex, Frame* iface) {
 	ip = ip_addr;
 	mac = mac_addr;
 	interface_mutex = if_mutex;
 	interface = iface;
 	rx_frame_count = 0;
-	cout << rx_frame_count << endl;
-	frame_generator = new Poisson(100);
+	name = hostname;
+	frame_generator = new Poisson(POISSON);
 }
 
 Host::~Host() {
@@ -54,7 +64,7 @@ void Host::run(std::string dst_mac) {
 	// cout << typeid(start_time).name() << endl;
 
 	while (1) {
-		// cout << mac << " looping" << endl;
+		// cout << name << "(" << mac << ")" <<" looping" << endl;
 		//update start time
 		start_time = std::chrono::high_resolution_clock::now();
 		// get the interarrival time for the next frame
@@ -62,12 +72,14 @@ void Host::run(std::string dst_mac) {
 		// loop until its time to send the frame
 		diff = std::chrono::high_resolution_clock::now() - start_time;
 		while (diff.count() < delay_us.count()) {
-			// cout << mac << " waiting " << delay_us.count()<< " s (at " << diff.count() << " s)"<< endl;
+			mutex_sleep();
+			// cout << name << "(" << mac << ")" <<": waiting " << delay_us.count()<< " s (at " << diff.count() << " s)"<< endl;
 			// check if the host on the other end of the link has locked the mutex
 			if (interface_mutex->try_lock()) {
 				// release the mutex if the other host has not locked it
 				// since it isn't time to send the frame yet and there's nothing to
 				// read
+				// cout << "got lock when should not have" << endl;
 				interface_mutex->unlock();
 				if (interface->get_frame_size() != 0) {
 					process_frame();
@@ -112,13 +124,15 @@ void Host::set_mutex(std::mutex* if_mutex) {
 }
 
 void Host::send_frame(int frame_size, std::string dst_mac) {
-	// cout << mac << " sending frame" << endl;	
+	// cout << name << "(" << mac << ")" <<": sending frame" << endl;	
 	// recursively attempt to put the frame on the link
 	// just in case there's a conflict
 	if (interface_mutex->try_lock()) {
 		interface->set_src_mac(mac);
 		interface->set_dst_mac(dst_mac);
 		interface->set_frame_size(frame_size);
+		std::cout << name << "(" << mac << ")" <<" sending " << frame_size << " bytes to " 
+			<< dst_mac << std::endl;
 		// std::cout << mac << " sent frame of " << interface-> get_frame_size() << " bytes to " 
 		// 	<< dst_mac << " at " << runtime << " s" << std::endl;
 		interface_mutex->unlock();		
@@ -129,13 +143,15 @@ void Host::send_frame(int frame_size, std::string dst_mac) {
 }
 
 void Host::process_frame() {
-	// cout << mac << " processing frame" << endl;
 	std::chrono::duration<double> diff;
 	// increase the frame count
 	// hang here to lock the mutex as soon as the other host is done with it
 	interface_mutex->lock();
-	// check on the link to see if the frame is for this hos
+	// check on the link to see if the frame is for this host
+
+	// cout << name << "(" << mac << ")" <<": received from " << interface->get_src_mac();
 	if (interface->get_dst_mac() == mac) {
+		// cout << name << "(" << mac << ")" <<": processing frame" << endl;
 		diff = std::chrono::high_resolution_clock::now() - host_start_time;
 		// print some details about the frame
 		increment_frame_count();
@@ -151,6 +167,10 @@ void Host::process_frame() {
 void Host::increment_frame_count() {
 	rx_frame_count += 1;
 	// cout << rx_frame_count << endl;
+}
+
+void Host::mutex_sleep() {
+	usleep(rand() % 100);
 }
 
 // int main(void) {
