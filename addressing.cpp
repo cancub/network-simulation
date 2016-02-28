@@ -21,7 +21,7 @@ using namespace std;
 
 std::string random_mac() {
 
-	srand (time(NULL));
+	
 	int character_number;
 	std::string result = "";
 
@@ -44,7 +44,6 @@ std::string random_mac() {
 }  
 
 std::string random_ip() {
-	srand (time(NULL));
 	int character_number;
 	std::string result = "";
 
