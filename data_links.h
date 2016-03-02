@@ -1,15 +1,23 @@
 #ifndef DATA_LINKS_H
 #define DATA_LINKS_H
 
-#include <iostream>
-#include <thread>
 #include <mutex>
-#include <string>
+#include <vector>
+#include "frames.h"
 
 /*
-Ethernet link has a mutex for use. Once the mutex has been grabbed,
-the winning node will send a frame across to the other node with
-put_frame_on_link()
+These are the links that will be used to connect nodes in the network.
+There will likely only be two links: Ethernet and air.
+Ethernet should be straight forward in that it's a passive object
+that just has an interface that nodes can add a frame to
+or retrieve a frame from, and there is a mutex that must be locked
+to interact with this interface. Air will be a bit different as there
+should be delay depending on the location of the station
+and there should also be a possibility of collision on the link.
+
+Ethernet should be agnostic to who or what is trying to interact with it.
+It should simply be a well-described object that both ends of the link
+can actively engage while it just sits there.
 */
 
 
@@ -27,15 +35,16 @@ class Ethernet {
 	*/
 	public:
 		Ethernet();
-		Ethernet(std::string, std::string);
-		void run();
+		~Ethernet();
+		std::mutex* get_mutex_pointer();
+		Frame* get_interface_pointer();
 	private:
-		std::mutex m;
-		std::vector<int*> interfaces(2,0);	// these are Alice and Bob's interfaces
-		std::vector<std::string> nodes(2,""); // the MACS of Alice and Bob
-		int move_frame();
+		std::mutex* m;
+		Frame* interface;
 };
 
 class Air {};
+
+// create_star(Switch*, std::vector<Host*>);
 
 #endif
