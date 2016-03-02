@@ -202,3 +202,9 @@ void Poisson::print_capture_pmf() {
 	}
 
 }
+
+int main(void){
+
+	Poisson p(50,1000);
+	p.run();
+}
