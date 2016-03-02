@@ -6,10 +6,11 @@
 
 class Frame {
 	public:
-		Frame();
-		Frame(std::string);
-		Frame(std::string, size_t);
-		Frame(std::string, std::string, size_t);
+		Frame(); // default constructor
+		Frame(std::string); // constructor with the source MAC address
+		Frame(std::string, size_t); // constructor with the source MAC address and the length of the frame
+		Frame(std::string, std::string, size_t); // constructor with the source MAC address, 
+												// the destination address and the length of the frame
 		~Frame();
 		std::string get_src_mac();
 		std::string get_dst_mac();
@@ -21,7 +22,7 @@ class Frame {
 		void set_src_ip(std::string);
 		void set_dst_ip(std::string);
 		void set_frame_size(size_t);
-		void erase();
+		void erase();	// reset the frame to be blank
 	private:
 		std::string source_mac;
 		std::string destination_mac;
