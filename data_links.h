@@ -29,7 +29,7 @@ class Ethernet {
 	2) alice places int value representing frame size at her interace
 	3) link takes it and places it on bob's interface
 	4) bob has noticed that the mutex was taken and so has been waiting to
-		receive frame
+		receive frame 
 	5) bob sees frame at interface, processes it and immediately attempts to place frame on link
 	6) go to 1) 
 	*/
