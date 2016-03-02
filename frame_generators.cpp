@@ -4,9 +4,7 @@
 #include <cmath>
 #include <algorithm>
 #include <unistd.h>
-// #include <chrono>
 #include "frame_generators.h"
-// #include <string>
 
 using namespace std;
 
@@ -18,7 +16,7 @@ Poisson::Poisson() {
 	process_points.reserve(10);
 }
 
-Poisson::Poisson(int l) {
+Poisson::Poisson(double l) {
 	lambda = l;
 	seconds = 0;
 	process_points.reserve(10);
@@ -41,7 +39,7 @@ void Poisson::set_lambda(double l) {
 	build_cdf();
 }
 
-void Poisson::start() {
+void Poisson::run() {
 	/* 
 	This function collects all the possion proccess points up
 	until the total time for the points is greater than the
@@ -92,6 +90,13 @@ void Poisson::build_cdf() {
 	// of being at it's maximum, 1. This is to prevent the code from
 	// continuing to compute values for the CDF that are exceptionally
 	// unlikely to be selected
+
+	/*
+	editor's note: in the future, it would be better to have the final product
+ 	of this array stored somewhere so that it can just be pulled if the lambda
+ 	has been used before. If it's a new lambda that has never been used before,
+ 	store the cdf after it has been created.
+	*/
 	while (1.0 - cdf_at_t > THRESHOLD) {
 		// each row of the CDF consists of a time and a CDF value at that time
 		std::vector<double> row;
@@ -113,7 +118,7 @@ double Poisson::interarrival_time() {
 	double result;
 	double test_number = (rand() % 1000000000) / 1000000000.0;
 
-	// locate the first index at which the value of the augmented cdf is
+	// locate the first index at which the value of the cdf is
 	// larger than the random number. This essentially works as a conversion
 	// from a uniform RV [0,1] to an exponential RV with the given lambda
 	for (int i = 0; i < cdf.size(); i++) {
@@ -197,22 +202,3 @@ void Poisson::print_capture_pmf() {
 	}
 
 }
-
-// int main(int argc, char *argv[]) {
-// 	// generate random number from a RV with poisson distribution
-// 	// determine proper values for standard internet traffic
-// 	// look up size distribution of frames
-// 	// generate frame arrival time and size
-
-// 	if (argc == 3){
-// 		Poisson my_frames(atoi(argv[1]),atoi(argv[2]));
-// 		srand (time(NULL));
-// 		my_frames.start();
-// 	}
-// 	else {
-// 		std::cout << "Not enough arguments. Need (lambda, seconds)" << std::endl;
-// 	}
-
-
-// 	return 0;
-// }
