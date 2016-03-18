@@ -66,21 +66,22 @@ void Switch::run() {
 
 
 	while (1) {
-		mutex_sleep();
+		// usleep(1);
 		for (int i = 0; i < interface_mutexes.size(); i++) {
 			// cout << name <<": here" << i << endl;
+			// if ((interfaces.at(i))->get_src_mac() != "") {
 			if ((interface_mutexes.at(i))->try_lock()) {
-				// release the mutex if the other host has not locked it
-				// since it isn't time to send the frame yet and there's nothing to
-				// read
-				(interface_mutexes.at(i))->unlock();
-				// if ((interfaces.at(i))->get_frame_size() != 0) {
-				// 	process_frame(i);
-				// }
-			}
+					// release the mutex if the other host has not locked it
+					// since it isn't time to send the frame yet and there's nothing to
+					// read
+					(interface_mutexes.at(i))->unlock();
+					if ((interfaces.at(i))->get_frame_size() != 0) {
+						process_frame(i);
+					}
+				}
 			else {
 				// process the frame
-				// cout << name << ": processing frame" << endl;
+				// cout << name << ": processing frame at " << i << endl;
 				process_frame(i);			
 			}
 
@@ -106,19 +107,20 @@ void Switch::unicast(int out_if) {
 	// cout << name << ": unicasting frame" << endl;	
 	// recursively attempt to put the frame on the link
 	// just in case there's a conflict
-	if ((interface_mutexes.at(out_if))->try_lock()) {
-		(interfaces.at(out_if))->set_src_mac(frame_copy->get_src_mac());
-		(interfaces.at(out_if))->set_dst_mac(frame_copy->get_dst_mac());
-		(interfaces.at(out_if))->set_frame_size(frame_copy->get_frame_size());
+	(interface_mutexes.at(out_if))->lock();
+	(interfaces.at(out_if))->set_src_mac(frame_copy->get_src_mac());
+	(interfaces.at(out_if))->set_dst_mac(frame_copy->get_dst_mac());
+	(interfaces.at(out_if))->set_frame_size(frame_copy->get_frame_size());
+		// cout << frame_copy->get_frame_size() << endl;
 		// std::cout << name << ": relayed frame from " << frame_copy->get_src_mac() << " to "
 			// << frame_copy->get_dst_mac() << " of size " << frame_copy->get_frame_size() << endl;
 			// << dst_mac << " at " << runtime << " s" << std::endl;
-		(interface_mutexes.at(out_if))->unlock();		
-	}
-	else {
-		cout << name << ": dropping frame *************************************" << endl;
-		usleep(10000000);		
-	}
+	(interface_mutexes.at(out_if))->unlock();		
+	// }
+	// else {
+	// 	cout << name << ": dropping frame *******************************" << endl;
+	// 	// usleep(10000000);		
+	// }
 	// else, drop the frame (this will be better when queues are introduced)
 }
 
@@ -146,14 +148,18 @@ void Switch::mutex_sleep() {
 
 void Switch::process_frame(int interface_number) {
 	std::string source_mac, destination_mac;
-	int out_if_number = 0,  in_if_number = 0;
+	int out_if_number = 0,  in_if_number = 0, f_size;
 	// std::chrono::duration<double> diff;
 	// increase the frame count
 	// hang here to lock the mutex as soon as the host is done with it
 	(interface_mutexes.at(interface_number))->lock();
 	if (interfaces.at(interface_number)->get_frame_size() != 0) {
+
+		// cout << "Processing frame at interface " << interface_number << endl;
 		
 		frame_copy = interfaces.at(interface_number);
+		f_size = frame_copy->get_frame_size();
+		// cout << f_size << endl;
 		source_mac = frame_copy->get_src_mac();
 		destination_mac = frame_copy->get_dst_mac();
 		out_if_number = get_table_interface_number(destination_mac);
@@ -167,6 +173,8 @@ void Switch::process_frame(int interface_number) {
 		}
 
 		if (out_if_number >= 0) {
+			// cout << name << ": unicasting " << interfaces.at(interface_number)->get_frame_size() 
+			// 	<< " bytes from " << source_mac << " to " << destination_mac << endl;
 			unicast(out_if_number);
 		}
 		else {

@@ -4,6 +4,11 @@
 #include <stdlib.h>
 #include <string>
 
+/*
+This is the class that will be our interface, since what is an interface if not
+just a pointer to a frame on a link?
+*/
+
 class Frame {
 	public:
 		Frame(); // default constructor

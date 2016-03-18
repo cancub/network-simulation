@@ -4,6 +4,7 @@
 #include <cmath>
 #include <algorithm>
 #include <unistd.h>
+#include <time.h>
 #include "frame_generators.h"
 
 using namespace std;
@@ -205,6 +206,7 @@ void Poisson::print_capture_pmf() {
 
 int main(void){
 
-	Poisson p(50,1000);
+	srand( time(NULL));
+	Poisson p(3,100000);
 	p.run();
 }

@@ -6,15 +6,13 @@
 #include <unistd.h>
 #include <string>
 #include <chrono>
-#include <typeinfo>
-
 #include "host.h"
 #include "frame_generators.h"
 #include "frames.h"
 
 using namespace std;
 
-#define POISSON 10
+#define POISSON 10 // the default lambda that we'll work with for now
 
 Host::Host() {
 	rx_frame_count = 0;
@@ -29,7 +27,9 @@ Host::Host(std::string ip_addr, std::string mac_addr, std::string hostname) {
 	frame_generator = new Poisson(POISSON);
 }
 
-Host::Host(std::string ip_addr, std::string mac_addr, std::string hostname, std::mutex* if_mutex, Frame* iface) {
+Host::Host(std::string ip_addr, std::string mac_addr, std::string hostname, 
+	std::mutex* if_mutex, Frame* iface) {
+
 	ip = ip_addr;
 	mac = mac_addr;
 	interface_mutex = if_mutex;
@@ -39,21 +39,23 @@ Host::Host(std::string ip_addr, std::string mac_addr, std::string hostname, std:
 	frame_generator = new Poisson(POISSON);
 }
 
-Host::~Host() {
-	// delete interface;
-	delete frame_generator;
-}
-
-// void Host::initialize() {}
+Host::~Host() {}
 
 void Host::run(std::string dst_mac) {
-	// get frame delay
-	// loop until then
-	// in loop, check to see if mutex is grabbed
-	// when grabbed, retrieve frame from interface and
-	// process it
-	// after loop finishes, grab mutex and put on interface
-	// go back to beginning
+
+	/*
+	this is the primary part of the Host class. The host finds an interarrival time from
+	it's specific poisson process, and waits until that time has elapsed before sending the frame.
+	While it's waiting, it checks the interface to see if anything is arriving. After the time
+	has elapsed, it locks the interface, puts the frame on the link and unlocks the interface
+	*/
+
+	/*
+	EDITOR'S NOTE: this should be done via tow threads later on. One thread to wait for 
+	a notification that the other end has sent a frame and one link to wait for the
+	interarrival time to be over before locking the link, putting the frame on the link,
+	unlocking the link and notifying the node at the other end of the link
+	*/
 
 	std::chrono::duration<double> delay_us; // the time that the code should wait for
 	auto start_time = std::chrono::high_resolution_clock::now(); // the time to test if code has waited
@@ -61,10 +63,8 @@ void Host::run(std::string dst_mac) {
 	host_start_time = start_time;
 	std::chrono::duration<double> diff;
 
-	// cout << typeid(start_time).name() << endl;
 
 	while (1) {
-		// cout << name << "(" << mac << ")" <<" looping" << endl;
 		//update start time
 		start_time = std::chrono::high_resolution_clock::now();
 		// get the interarrival time for the next frame
@@ -73,28 +73,35 @@ void Host::run(std::string dst_mac) {
 		diff = std::chrono::high_resolution_clock::now() - start_time;
 		while (diff.count() < delay_us.count()) {
 			mutex_sleep();
-			// cout << name << "(" << mac << ")" <<": waiting " << delay_us.count()<< " s (at " << diff.count() << " s)"<< endl;
 			// check if the host on the other end of the link has locked the mutex
 			if (interface_mutex->try_lock()) {
 				// release the mutex if the other host has not locked it
 				// since it isn't time to send the frame yet and there's nothing to
 				// read
-				// cout << "got lock when should not have" << endl;
 				interface_mutex->unlock();
-				if (interface->get_frame_size() != 0) {
-					process_frame();
-				}
+
+				// if (interface->get_frame_size() != 0) {
+				// 	process_frame();
+				// }
 			}
 			else {
 				// process the frame
 				process_frame();			
 			}
 
+			//update the time difference between the start time and the current time
 			diff = std::chrono::high_resolution_clock::now() - start_time;
 		}
 
-		// now that the code is done waiting, it can attempt to send the frame
-		send_frame(rand() % 1500, dst_mac);
+		// now that the code is done waiting, it can attempt to send the frame.
+		// the frame will be between 60 and 1500 bytes.
+		/*
+		EDITOR'S NOTE: the frame size should be generated later on using probabilities
+		related to REAL internet traffic. Maybe we could run a wireshark capture on a lab
+		computer over several days to get a good idea. Ideally, this would even be time-of-
+		day-dependent
+		*/
+		send_frame((rand() % 1441) + 60, dst_mac);
 
 
 
@@ -124,7 +131,6 @@ void Host::set_mutex(std::mutex* if_mutex) {
 }
 
 void Host::send_frame(int frame_size, std::string dst_mac) {
-	// cout << name << "(" << mac << ")" <<": sending frame" << endl;	
 	// recursively attempt to put the frame on the link
 	// just in case there's a conflict
 	if (interface_mutex->try_lock()) {
@@ -133,9 +139,7 @@ void Host::send_frame(int frame_size, std::string dst_mac) {
 		interface->set_frame_size(frame_size);
 		std::cout << name << "(" << mac << ")" <<" sending " << frame_size << " bytes to " 
 			<< dst_mac << std::endl;
-		// std::cout << mac << " sent frame of " << interface-> get_frame_size() << " bytes to " 
-		// 	<< dst_mac << " at " << runtime << " s" << std::endl;
-		interface_mutex->unlock();		
+		interface_mutex->unlock();	
 	}
 	else {
 		send_frame(frame_size, dst_mac);
@@ -149,9 +153,7 @@ void Host::process_frame() {
 	interface_mutex->lock();
 	// check on the link to see if the frame is for this host
 
-	// cout << name << "(" << mac << ")" <<": received from " << interface->get_src_mac();
 	if (interface->get_dst_mac() == mac) {
-		// cout << name << "(" << mac << ")" <<": processing frame" << endl;
 		diff = std::chrono::high_resolution_clock::now() - host_start_time;
 		// print some details about the frame
 		increment_frame_count();
