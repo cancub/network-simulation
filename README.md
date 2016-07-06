@@ -28,6 +28,9 @@ COMPLETED WORK:
 --------------------------------------------------------------------------------
 CURRENT WORK:
 
+- should probably implement an interface class that can be inherited by hosts, switches, routers
+	for their own purposes
+
 - expose link object in nodes, with each link containing a mutex that must be 
 	given to each node attached to it
 
@@ -44,6 +47,8 @@ CURRENT WORK:
 		- put frame on link
 		- release lock
 		- set transmission condition variable
+
+	threads are independent (full duplex)
 
 	at switch:
 	one thread for each reception condition variable
