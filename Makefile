@@ -12,4 +12,4 @@ frame_generators: frame_generators.o
 	$(CXX) $(CXXFLAGS) -o frame_generators frame_generators.o 
 
 clean:
-	rm *.o host test *.h.gch
+	rm -f *.o *.h.gch test host frame_generators
