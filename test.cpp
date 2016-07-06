@@ -7,7 +7,7 @@
 #include "addressing.h"
 #include "networking_devices.h"
 
-using namespace std;
+// using namespace std;
 
 int main(void) {
 	srand (time(NULL));
@@ -25,12 +25,15 @@ int main(void) {
 	my_switch.plug_in_device(&alice);
 	my_switch.plug_in_device(&bob);
 
+	std::cout << "Alice: \t" << alice_mac << std::endl;
+	std::cout << "Bob: \t" << bob_mac << std::endl;
+
 	// std::cout << i++ << std::endl;
-	thread test_switch(&Switch::run, &my_switch);
+	std::thread test_switch(&Switch::run, &my_switch);
 	// std::cout << i++ << std::endl;
-	thread test_alice(&Host::run,&alice, bob_mac);
+	std::thread test_alice(&Host::run,&alice, bob_mac);
 	// std::cout << i++ << std::endl;
-	thread test_bob(&Host::run, &bob, alice_mac);
+	std::thread test_bob(&Host::run, &bob, alice_mac);
 
 	// std::cout << i++ << std::endl;
 	test_switch.join();
