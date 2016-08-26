@@ -22,7 +22,7 @@ class Host{
         // Host(std::string, std::string, std::string, std::mutex*, Frame*); // same as above but with a
                                                                             // mutex and interface
         ~Host();
-        // void run(std::string); // start sending frames to the specified MAC address
+        void run(std::string); // start sending frames to the specified MAC address
         std::string get_ip();
         std::string get_mac();
         int get_frame_count();
@@ -38,6 +38,7 @@ class Host{
         void process_frame(); // process an incoming frames
         void increment_frame_count();
         void mutex_sleep(); // sleep a random amount of microseconds so that there's less problems
+        void host_print(std::string);
         Poisson* frame_generator; // the object that will create all the interarrival times
         Frame* rx_interface; // the location where the frames will be found/put on
         std::mutex* rx_interface_mutex; // mutex to lock before interacting with interface
