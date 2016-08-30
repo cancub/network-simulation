@@ -10,11 +10,14 @@
 #include "host.h"
 #include "frame_generators.h"
 #include "frames.h"
-#include <condition_variable> // std::condition_variable
+#include <iomanip>
+#include "data_links.h"
 
 using namespace std;
 
 #define POISSON 10 // the default lambda that we'll work with for now
+
+// #define DEBUG
 
 Host::Host() {
     rx_frame_count = 0;
@@ -72,16 +75,12 @@ void Host::set_mac(std::string mac_addr) {
     mac = mac_addr;
 }
 
-void Host::set_rx_interface(Frame* frame_interface, std::mutex* if_mutex, std::condition_variable* cv) {
-    rx_interface = frame_interface;
-    rx_interface_mutex = if_mutex;
-    rx_condition_variable = cv;
+void Host::set_rx_interface(Ethernet* rx_if) {
+    rx_interface = rx_if;
 }
 
-void Host::set_tx_interface(Frame* frame_interface, std::mutex* if_mutex, std::condition_variable* cv) {
-    tx_interface = frame_interface;
-    tx_interface_mutex = if_mutex;
-    tx_condition_variable = cv;
+void Host::set_tx_interface(Ethernet* tx_if) {
+    tx_interface = tx_if;
 }
 
 void Host::sender(std::string dst_mac) {
@@ -94,10 +93,12 @@ void Host::sender(std::string dst_mac) {
 
     while (1) {
         // get the interarrival time for the next frame
-        delay_us = (int)(frame_generator->interarrival_time()*1000000);
+        delay_us = frame_generator->interarrival_time()*1000000;
 
         // wait this amount of time
-        host_print("waiting " + std::to_string(delay_us) + " ms");
+#ifdef DEBUG 
+        host_print("waiting " + std::to_string(delay_us/1000) + " ms");
+#endif
         usleep(delay_us);
 
         // now that the code is done waiting, it can attempt to send the frame.
@@ -113,45 +114,44 @@ void Host::sender(std::string dst_mac) {
 
 }
 
-void Host::send_frame(int frame_size, std::string dst_mac) {
-    // recursively attempt to put the frame on the link
-    // just in case there's a conflict
-    std::unique_lock<std::mutex> lck(*tx_interface_mutex);
-    tx_interface->set_src_mac(mac);
-    tx_interface->set_dst_mac(dst_mac);
-    tx_interface->set_frame_size(frame_size);
-    host_print("sending " +std::to_string(frame_size) + " bytes to " + dst_mac);
-    tx_condition_variable->notify_one();
-}
-
 void Host::receiver() {
     // this is to be run in a thread that will wait on a condition variable to check the rx
     // interface. 
     while (1) {
-        std::unique_lock<std::mutex> lck(*rx_interface_mutex);
-        rx_condition_variable->wait(lck);
         // consume:
-        process_frame();
+        process_frame(rx_interface->receive());
     }
 
 }
 
-void Host::process_frame() {
-    std::chrono::duration<double> diff;
-    // increase the frame count
+void Host::send_frame(int frame_size, std::string dst_mac) {
+    Frame* tx_frame = new Frame(mac, dst_mac,frame_size);
+    // tx_frame->set_src_mac(mac);
+    // tx_frame->set_dst_mac(dst_mac);
+    // tx_frame->set_frame_size(frame_size);
+    tx_interface->transmit(tx_frame);
+#ifdef DEBUG
+    host_print("sending " +std::to_string(frame_size) + " bytes to " + dst_mac);
+#endif
+}
 
-    if (rx_interface->get_dst_mac() == mac) {
+void Host::process_frame(Frame* rx_frame) {
+    std::chrono::duration<double> diff;
+
+    if (rx_frame->get_dst_mac() == mac) {
         diff = std::chrono::high_resolution_clock::now() - host_start_time;
         // print some details about the frame
         increment_frame_count();
-        std::string statement = std::to_string(get_frame_count()) + " " + std::to_string(diff.count()) + " " + 
-                                std::to_string(rx_interface->get_frame_size()) + " " + rx_interface->get_src_mac();
+        std::string statement = std::to_string(get_frame_count()) + " " + std::to_string(diff.count()) 
+                                + " " + rx_frame->get_src_mac() + " " + std::to_string(rx_frame->get_frame_size());
         host_print(statement);
         // host_print(std::to_string(get_frame_count()) + " " << mac + ": " + std::to_string(diff.count()) + " frame of "
         //     + std::to_string(rx_interface->get_frame_size()) + " bytes received from " + rx_interface->get_src_mac());
         // // get rid of the frame to signify that it was received
-        rx_interface->erase();
-    } 
+    } else {
+        host_print("received frame for desination mac: " + rx_frame->get_dst_mac());
+    }
+    delete rx_frame;
 }
 
 void Host::increment_frame_count() {
@@ -164,7 +164,7 @@ void Host::mutex_sleep() {
 }
 
 void Host::host_print(std::string statement) {
-    std::cout << name << ": " << statement << endl;
+    std::cout << setw(10) << name << ": " << statement << endl;
 }
 // int main(void) {
 

@@ -4,6 +4,8 @@
 #include <mutex>
 #include <vector>
 #include "frames.h"
+#include <condition_variable> // std::condition_variable
+#include "wqueue.h"
 
 /*
 These are the links that will be used to connect nodes in the network.
@@ -23,24 +25,17 @@ can actively engage while it just sits there.
 
 
 class Ethernet {
-	/*
-	process for frame sending is: 
-	1) alice claims mutex
-	2) alice places int value representing frame size at her interace
-	3) link takes it and places it on bob's interface
-	4) bob has noticed that the mutex was taken and so has been waiting to
-		receive frame 
-	5) bob sees frame at interface, processes it and immediately attempts to place frame on link
-	6) go to 1) 
-	*/
-	public:
-		Ethernet();
-		~Ethernet();
-		std::mutex* get_mutex_pointer();
-		Frame* get_interface_pointer();
-	private:
-		std::mutex* m;
-		Frame* interface;
+    /*
+    Thanks to the addition of the wqueue, use of the Ethernet link is extremely simple.
+    Just use wrapper functions for the wqueue's thread-safe prduction and consumption functions
+    */
+    public:
+        Ethernet();
+        ~Ethernet();
+        void transmit(Frame*);
+        Frame* receive();
+    private:
+        wqueue* interface;
 };
 
 class Air {};
