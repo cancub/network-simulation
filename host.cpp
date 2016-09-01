@@ -20,9 +20,9 @@ using namespace std;
 #define FRAME_SIZE_MIN 60  
 #define BROADCAST_MAC "FF:FF:FF:FF:FF:FF"
 
-#define DEBUG
-#define TEST
-#define NUMBER_OF_FRAMES 10 // the number of frames to be sent by the host in a test
+// #define DEBUG
+// #define TEST
+#define NUMBER_OF_FRAMES 100 // the number of frames to be sent by the host in a test
 
 
 Host::Host() {
@@ -30,7 +30,9 @@ Host::Host() {
     frame_generator = new Poisson(POISSON);
     host_start_time = std::chrono::high_resolution_clock::now();
     name = "unnamed";
+#ifdef DEBUG
     host_print("Online");
+#endif
 }
 
 Host::Host(std::string ip_addr, std::string mac_addr, std::string hostname) {
@@ -40,8 +42,11 @@ Host::Host(std::string ip_addr, std::string mac_addr, std::string hostname) {
     name = hostname;
     frame_generator = new Poisson(POISSON);
     host_start_time = std::chrono::high_resolution_clock::now();
-    host_print("Online with MAC " + mac);
+#ifdef DEBUG
+    // host_print("Online with MAC " + mac);
+#endif
 }
+
 
 Host::~Host() {}
 
@@ -109,7 +114,7 @@ void Host::sender(std::vector<std::string>* mac_list) {
                 continue;
 #else
                 // send a broadcast frame if this host has selected its own MAC
-                dst_mac = "FF:FF:FF:FF:FF:FF";
+                dst_mac = BROADCAST_MAC;
                 frame_size = 1;
                 break;
 #endif
@@ -172,7 +177,7 @@ void Host::process_frame(Frame* rx_frame) {
 
     std::string dst_mac = rx_frame->get_dst_mac();
 
-    if (mac.compare(dst_mac) == 0) {
+    if (dst_mac.compare(mac) == 0) {
         // this frame was destined for this host, so print some details about the frame
 
         diff = std::chrono::high_resolution_clock::now() - host_start_time;
@@ -181,7 +186,7 @@ void Host::process_frame(Frame* rx_frame) {
                                 + " " + rx_frame->get_src_mac() + " " + std::to_string(rx_frame->get_frame_size());
         host_print(statement);
        
-    } else if (mac.compare(BROADCAST_MAC) == 0) {
+    } else if (dst_mac.compare(BROADCAST_MAC) == 0) {
         host_print("Received broadcast frame from " + rx_frame->get_src_mac());
     } else {
         host_print("received frame for different desination mac: " + rx_frame->get_dst_mac());

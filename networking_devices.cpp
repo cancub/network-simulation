@@ -22,10 +22,9 @@ according to a routing table (which is built up via inspecting source mac addres
 
 using namespace std;
 
-#define NUMBER_OF_INTERFACES 6      // the assumed number of physical interfaces the switch has 
+#define NUMBER_OF_INTERFACES 10      // the assumed number of physical interfaces the switch has 
 
-
-#define DEBUG
+// #define DEBUG
 
 Switch::Switch() {
     rx_interfaces.reserve(NUMBER_OF_INTERFACES);
@@ -133,6 +132,9 @@ void Switch::sender() {
             unicast(tx_frame, if_id);
         } else {
             // send to all interfaces
+#ifdef DEBUG
+            switch_print("Cannot find host MAC in routing table: " + tx_frame->get_dst_mac());
+#endif
             broadcast(tx_frame);
         }  
     }

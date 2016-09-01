@@ -51,6 +51,10 @@ std::string random_mac() {
     return result;
 }  
 
+std::string uniform_mac(std::string rep) {
+    return rep + rep + ":" + rep + rep + ":" + rep + rep + ":" + rep + rep + ":" + rep + rep + ":" + rep + rep;
+}
+
 std::string random_ip() {
     // again, as one might expect, this takes no argument
     // and returns a random ip

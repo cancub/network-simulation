@@ -65,7 +65,7 @@ void multiple_switch_test(int number_of_hosts, int number_of_switches) {
     }
 
     for (int i = 0; i < number_of_hosts; i++){
-        mac_addresses.push_back(random_mac());
+        mac_addresses.push_back(uniform_mac(std::to_string(i)));
         Host* new_host = new Host(random_ip(), mac_addresses.back(), name_list[i]);
         int target_switch = rand() % switches.size();
         switches.at(target_switch)->plug_in_device(new_host);
@@ -73,19 +73,7 @@ void multiple_switch_test(int number_of_hosts, int number_of_switches) {
         hosts.push_back(new_host);
     }
 
-    // Host bob(random_ip(), bob_mac, "bob");
-    // Host carol(random_ip(), carol_mac, "carol");
-    // Switch switch1("switch1");
-    // Switch switch2("switch2");
-
-    // switch1.plug_in_device(&alice);
-    // switch1.plug_in_device(&switch2);
-    // switch2.plug_in_device(&bob);
-    // switch2.plug_in_device(&carol);
-
-    // try to connect two switches now
-    // plug in device should exchange interfaces
-    // rx_interface = other_switch.set_tx_interface();
+    int ch = getchar();
 
     for (int i = 0; i < number_of_switches; i++) {
         std::thread* new_thread = new std::thread(&Switch::run, switches.at(i));
@@ -97,18 +85,6 @@ void multiple_switch_test(int number_of_hosts, int number_of_switches) {
         host_threads.push_back(new_thread);
     }
 
-    // std::thread test_switch2(&Switch::run, &switch2);
-    // std::thread test_alice(&Host::run,&alice, &mac_addresses);
-    // std::thread test_bob(&Host::run, &bob, &mac_addresses);
-    // std::thread test_carol(&Host::run, &carol, &mac_addresses);
-
-    // test_switch.join();
-    // test_switch1.join();
-    // test_switch2.join();
-    // test_alice.join();
-    // test_bob.join();
-    // test_carol.join();
-
     for (int i = 0; i < number_of_switches; i++) {
         switch_threads.at(i)->join();
     }
@@ -118,23 +94,13 @@ void multiple_switch_test(int number_of_hosts, int number_of_switches) {
     }
 
     while (switches.size() > 0) {
-        // std::thread* switch_thread_to_delete = switch_threads.back();
         switch_threads.pop_back();
-        // delete switch_thread_to_delete;
-
-        // Switch* switch_to_delete = switches.back();
         switches.pop_back();
-        // delete switch_to_delete;
     }
 
     while (hosts.size() > 0) {
-        // std::thread* host_thread_to_delete = host_threads.back();
         host_threads.pop_back();
-        // delete host_thread_to_delete;
-
-        // Host* host_to_delete = hosts.back();
         hosts.pop_back();
-        // delete host_to_delete;
     }
 }
 
