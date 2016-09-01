@@ -2,6 +2,7 @@
 #define HOST_H
 
 #include <string>
+#include <vector>
 #include <mutex>
 #include "frame_generators.h"
 #include "frames.h"
@@ -23,7 +24,7 @@ class Host{
         // Host(std::string, std::string, std::string, std::mutex*, Frame*); // same as above but with a
                                                                             // mutex and interface
         ~Host();
-        void run(std::string); // start sending frames to the specified MAC address
+        void run(std::vector<std::string>*); // start sending frames to the specified MAC address
         std::string get_ip();
         std::string get_mac();
         int get_frame_count();
@@ -31,7 +32,7 @@ class Host{
         void set_mac(std::string);
         void set_rx_interface(Ethernet*);
         void set_tx_interface(Ethernet*);
-        void sender(std::string dst_mac);
+        void sender(std::vector<std::string>*);
         void receiver();
     private:
         void send_frame(int, std::string); // sending a frame to a specific MAC address

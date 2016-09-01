@@ -17,7 +17,8 @@ using namespace std;
 
 #define POISSON 10 // the default lambda that we'll work with for now
 
-#define DEBUG
+// #define DEBUG
+#define TEST
 
 Host::Host() {
     rx_frame_count = 0;
@@ -50,11 +51,11 @@ Host::Host(std::string ip_addr, std::string mac_addr, std::string hostname) {
 
 Host::~Host() {}
 
-void Host::run(std::string dst_mac) {
+void Host::run(std::vector<std::string>* mac_list) {
     // make the threads for the sending and receiving interfaces
     // let them run
     std::thread receive_thread(&Host::receiver,this);
-    std::thread send_thread(&Host::sender, this, dst_mac);
+    std::thread send_thread(&Host::sender, this, mac_list);
 
     receive_thread.join();
     send_thread.join();
@@ -82,19 +83,38 @@ void Host::set_tx_interface(Ethernet* tx_if) {
     tx_interface = tx_if;
 }
 
-void Host::sender(std::string dst_mac) {
+void Host::sender(std::vector<std::string>* mac_list) {
     // this is to be run in a thread that will wait for a specific interarrival time
     // before sending a frame. The sender then sets a condition variable, representing 
     // the high voltage at the receiver end.
 
     int delay_us;
 
+    int self_mac_element_id;
 
-    while (1) {
-        // get the interarrival time for the next frame
+    int receiver_mac_element_id;
+
+    for(int i = 0; i < mac_list->size(); i++) {
+        if (mac.compare(mac_list->at(i)) == 0) {
+            self_mac_element_id = i;
+            break;
+        }
+    }
+
+#ifdef TEST
+    for(int i = 0; i < 10; i++) {
+#else
+    while(1) {
+#endif
+        while(1) {
+            receiver_mac_element_id = rand() % mac_list->size();
+            if (receiver_mac_element_id != self_mac_element_id) {
+                break;
+            }
+        }
+
         delay_us = frame_generator->interarrival_time()*1000000;
 
-        // wait this amount of time
 #ifdef DEBUG 
         host_print("waiting " + std::to_string(delay_us/1000) + " ms");
 #endif
@@ -108,8 +128,12 @@ void Host::sender(std::string dst_mac) {
         computer over several days to get a good idea. Ideally, this would even be time-of-
         day-dependent
         */
-        send_frame((rand() % 1441) + 60, dst_mac);
+        send_frame((rand() % 1441) + 60, mac_list->at(receiver_mac_element_id));
     }
+
+ #ifdef TEST
+    host_print("done sending");
+ #endif   
 
 }
 
@@ -128,10 +152,10 @@ void Host::send_frame(int frame_size, std::string dst_mac) {
     // tx_frame->set_src_mac(mac);
     // tx_frame->set_dst_mac(dst_mac);
     // tx_frame->set_frame_size(frame_size);
-    tx_interface->transmit(tx_frame);
 #ifdef DEBUG
     host_print("sending " +std::to_string(frame_size) + " bytes to " + dst_mac);
 #endif
+    tx_interface->transmit(tx_frame);
 }
 
 void Host::process_frame(Frame* rx_frame) {
@@ -144,13 +168,21 @@ void Host::process_frame(Frame* rx_frame) {
         std::string statement = std::to_string(get_frame_count()) + " " + std::to_string(diff.count()) 
                                 + " " + rx_frame->get_src_mac() + " " + std::to_string(rx_frame->get_frame_size());
         host_print(statement);
+       
         // host_print(std::to_string(get_frame_count()) + " " << mac + ": " + std::to_string(diff.count()) + " frame of "
         //     + std::to_string(rx_interface->get_frame_size()) + " bytes received from " + rx_interface->get_src_mac());
         // // get rid of the frame to signify that it was received
     } else {
-        host_print("received frame for desination mac: " + rx_frame->get_dst_mac());
+        host_print("received frame for different desination mac: " + rx_frame->get_dst_mac());
     }
+
+#ifdef DEBUG 
+    host_print("deleting frame");
+#endif
     delete rx_frame;
+#ifdef DEBUG 
+    host_print("frame deleted");
+#endif
 }
 
 void Host::increment_frame_count() {

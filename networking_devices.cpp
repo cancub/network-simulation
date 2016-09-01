@@ -22,6 +22,8 @@ switch checks all the interfaces in a round robin fashion
 if a mutex is locked
 */
 
+// #define DEBUG
+
 Switch::Switch() {
     connected_hosts.reserve(6);
     rx_interfaces.reserve(6);
@@ -131,11 +133,11 @@ void Switch::sender() {
 
 void Switch::unicast(Frame* tx_frame, int if_id) {
     // no need to do anything fancy, wqueue takes care of mutexes and condition variables
-    std::cout << setw(15) <<  "[Sender]" << ": sending frame out interface " << if_id << std::endl;
-    tx_interfaces.at(if_id)->transmit(tx_frame);
+
 #ifdef DEBUG
-    // host_print("sending " +std::to_string(tx_frame->get_frame_size()) + " bytes to " + tx_frame->get_dst_mac());
+    std::cout << setw(15) <<  "[Sender]" << ": sending frame out interface " << if_id << std::endl;
 #endif
+    tx_interfaces.at(if_id)->transmit(tx_frame);
 }
 
 void Switch::broadcast(Frame* tx_frame) {
@@ -151,30 +153,40 @@ void Switch::broadcast(Frame* tx_frame) {
             unicast(tx_frame->copy(), i);
         }
     }
-
+#ifdef DEBUG
+    cout << "switch deleting tx frame" << endl;
+#endif
     delete tx_frame;
+#ifdef DEBUG
+    cout << "tx frame deleted" << endl;
+#endif
 }
 
 void Switch::receiver(int if_id) {
+    Frame* rx_frame;
     string RxName = "[Receiver" + to_string(if_id) + "]";
     // continually loop in trying to obtain a new frame from the medium
     while (1) {
-        process_frame(rx_interfaces.at(if_id)->receive());
+        rx_frame = rx_interfaces.at(if_id)->receive();
+#ifdef DEBUG
         std::cout << setw(15) << RxName << ": received frame" << std::endl;
+#endif
+        process_frame(rx_frame, if_id);
     }
 }
 
-void Switch::process_frame(Frame* rx_frame) {
+void Switch::process_frame(Frame* rx_frame, int in_if) {
     // add the frame to the queue of frames to be transmitted
+    // check to see if the sending device is listed and add the device to the i/f table if its not there
+    int if_id = get_table_interface_number(rx_frame->get_src_mac());
+
+    if (if_id == -1) {
+        // add interface to table if it does not yet exist there
+        add_table_entry(rx_frame->get_src_mac(), in_if);
+    }
+
     frame_queue->add(rx_frame);
 
-    // check to see if the sending device is listed and add the device to the i/f table if its not there
-    int in_if = get_table_interface_number(rx_frame->get_src_mac());
-
-    if (in_if == -1) {
-        // add interface to table if it does not yet exist there
-        add_table_entry(rx_frame->get_src_mac());
-    }
 }
 
 int Switch::get_table_interface_number(string mac_addr) {
@@ -204,12 +216,13 @@ std::string Switch::get_table_interface_address(int if_number) {
     return result;
 }
 
-void Switch::add_table_entry(std::string source_mac) {
+void Switch::add_table_entry(std::string source_mac, int if_id) {
     TableEntry* new_entry = new TableEntry;
-    new_entry->interface_number = total_ifs++;
+    new_entry->interface_number = if_id;
     new_entry->address = source_mac;
     switch_table.push_back(new_entry);
+#ifdef DEBUG
     std::cout << "table entry added for " << source_mac << std::endl;
-
     print_routing_table();
+#endif
 }

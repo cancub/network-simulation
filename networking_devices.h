@@ -31,10 +31,10 @@ class Switch {
         void unicast(Frame*, int);
         void broadcast(Frame*);
         void receiver(int);
-        void process_frame(Frame*);
+        void process_frame(Frame*, int);
         int get_table_interface_number(std::string);
         std::string get_table_interface_address(int);
-        void add_table_entry(std::string);
+        void add_table_entry(std::string, int);
         int total_ifs;
         std::vector<Host*> connected_hosts;
         std::vector<Ethernet*> rx_interfaces;
