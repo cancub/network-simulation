@@ -94,6 +94,10 @@ void Host::sender(std::vector<std::string>* mac_list) {
 
     int receiver_mac_element_id;
 
+    int frame_size;
+
+    std::string dst_mac;
+
     for(int i = 0; i < mac_list->size(); i++) {
         if (mac.compare(mac_list->at(i)) == 0) {
             self_mac_element_id = i;
@@ -106,11 +110,13 @@ void Host::sender(std::vector<std::string>* mac_list) {
 #else
     while(1) {
 #endif
-        while(1) {
-            receiver_mac_element_id = rand() % mac_list->size();
-            if (receiver_mac_element_id != self_mac_element_id) {
-                break;
-            }
+        receiver_mac_element_id = rand() % mac_list->size();
+        if (receiver_mac_element_id == self_mac_element_id) {
+            dst_mac = "FF:FF:FF:FF:FF:FF";
+            frame_size = 1;
+        } else {
+            dst_mac = mac_list->at(receiver_mac_element_id);
+            frame_size = (rand() % 1441) + 60;
         }
 
         delay_us = frame_generator->interarrival_time()*1000000;
@@ -128,7 +134,7 @@ void Host::sender(std::vector<std::string>* mac_list) {
         computer over several days to get a good idea. Ideally, this would even be time-of-
         day-dependent
         */
-        send_frame((rand() % 1441) + 60, mac_list->at(receiver_mac_element_id));
+        send_frame(frame_size, dst_mac);
     }
 
  #ifdef TEST
