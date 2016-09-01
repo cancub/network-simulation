@@ -1,12 +1,14 @@
 host -- link -- host (COMPLETE)
 
-host -- link -- switch -- link -- host
+host -- link -- switch -- link -- host (COMPLETE)
 
-host -- link -- switch -- link -- host
+host -- link -- switch -- link -- switch -- host (COMPLETE)
 				   |
 				  link
 				   |
 				  host
+
+
 
 				gateway
 			       |
@@ -23,50 +25,36 @@ COMPLETED WORK:
 - make frame sending process
 - make host which uses frame sending process
 - communicate frame between two hosts seperated by a switch
+- standardized interface class with thread safe queue
+- every network device sees an interface as a combination of a rx and tx interface,
+  each with its own mutex and queue
+- switch object has many rx threads and one tx thread which operate independently and without
+  collision (full duplex)
+- same for hosts, obviously
+- hosts can be plugged into each other or a switch, switches can be plugged into each other
+- frames can be copied in case they need to be broadcast to many ports
+- frames are created and consumed within the network, reference to frame object gets passed around
 
 
 --------------------------------------------------------------------------------
 CURRENT WORK:
 
-- should probably implement an interface class that can be inherited by hosts, switches, routers
-	for their own purposes
+- begin to build up network layer
+	- stations must obtain an IP
+	- set up basic ip frames such as bootp, icmp, arp
 
-- expose link object in nodes, with each link containing a mutex that must be 
-	given to each node attached to it
-
--need to implement new paradigm for communicating frames:
-
-	one thread waits on reception condition variable
-		- upon setting of variable, takes lock
-		- prints out contents of frame
-		- sets contents to 0
-		- unlocks
-	another thread for sending
-		- wait until time is up for sending a frame
-		- take the lock
-		- put frame on link
-		- release lock
-		- set transmission condition variable
-
-	threads are independent (full duplex)
-
-	at switch:
-	one thread for each reception condition variable
-		- upon setting of variable, takes lock
-		- two options:
-			- copy frame, unlock, notify other end of link, get queue mutex, put in queue, release lock,
-				notify all threads trying to access queue
-			- get queue mutex, move frame directly from the interface to the main queue,
-				release both mutexes and notify all interested parties for both
+- create a gateway device
+	- provides ip addresses to other devices in network
+	- can have whitelist
 
 --------------------------------------------------------------------------------
 FUTURE WORK:
 
 - implement routing protocols, network discovery protocols for switch to figure out ports
-- have frame sent from one specific host to another
+- throughput and dropped frames monitoring
+- make frame size based on actual frame contents
+	- have it calculated at time of sending
 - multicast
-- arp
-- ping
 - tcp
 - introduce error for force retransmit
 - make wireless link class
