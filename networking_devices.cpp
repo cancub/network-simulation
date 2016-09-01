@@ -11,50 +11,49 @@
 #include <iomanip>
 #include "wqueue.h"
 
+/*
+This switch class is for conencting to other switches and hosts for relaying frames.
+Devices are "plugged into" this switch (and this switch can be plugged into other switches). 
+When a frame is sent by the device on the other end of an interface, one of many receiving threads
+processes the frame and places it in a thread-safe queue. A single sending thread then
+takes the frame and sends it to the interface associated with the destination mac address
+according to a routing table (which is built up via inspecting source mac addresses)
+*/
+
 using namespace std;
 
-/*
-switch creates oxes and interfaces
-switch receives a vector of hosts or has hosts given to it one by one
-switch gives a mutex and an interface to each connected host
-switch runs
-switch checks all the interfaces in a round robin fashion
-if a mutex is locked
-*/
+#define NUMBER_OF_INTERFACES 6      // the assumed number of physical interfaces the switch has 
+
 
 // #define DEBUG
 
 Switch::Switch() {
-    connected_hosts.reserve(6);
-    rx_interfaces.reserve(6);
-    tx_interfaces.reserve(6);
-    switch_table.reserve(6);
-    rx_thread_list.reserve(6);
+    rx_interfaces.reserve(NUMBER_OF_INTERFACES);
+    tx_interfaces.reserve(NUMBER_OF_INTERFACES);
+    switch_table.reserve(NUMBER_OF_INTERFACES);
+    rx_thread_list.reserve(NUMBER_OF_INTERFACES);
     frame_queue = new wqueue<Frame*>;
     total_ifs = 0;
 }
 
 Switch::Switch(std::string switch_name) {
-    connected_hosts.reserve(6);
-    rx_interfaces.reserve(6);
-    tx_interfaces.reserve(6);
-    switch_table.reserve(6);
-    rx_thread_list.reserve(6);
+    rx_interfaces.reserve(NUMBER_OF_INTERFACES);
+    tx_interfaces.reserve(NUMBER_OF_INTERFACES);
+    switch_table.reserve(NUMBER_OF_INTERFACES);
+    rx_thread_list.reserve(NUMBER_OF_INTERFACES);
     frame_queue = new wqueue<Frame*>;
     name = switch_name;
     total_ifs = 0;
 }
 
 Switch::Switch(std::vector<Host*> hosts_to_connect, std::string switch_name) {
-    connected_hosts.reserve(6);
-    rx_interfaces.reserve(6);
-    tx_interfaces.reserve(6);
-    switch_table.reserve(6);
-    rx_thread_list.reserve(6);
+    rx_interfaces.reserve(NUMBER_OF_INTERFACES);
+    tx_interfaces.reserve(NUMBER_OF_INTERFACES);
+    switch_table.reserve(NUMBER_OF_INTERFACES);
+    rx_thread_list.reserve(NUMBER_OF_INTERFACES);
     frame_queue = new wqueue<Frame*>;
     name = switch_name;
     total_ifs = 0;
-    connected_hosts = hosts_to_connect;
 }
 
 Switch::~Switch() {
@@ -65,32 +64,33 @@ Switch::~Switch() {
     }
 }
 
-void Switch::plug_in_device(Host* host_to_connect) {
+void Switch::plug_in_device(Host* device_to_connect) {
+    // when notified that a device has been plugged in,
+    // the switch creates a new rx and tx interface that it associates with that
+    // n'th port and provides those interfaces to the device that was
+    // just connected
+
     tx_interfaces.push_back(new Ethernet);
     rx_interfaces.push_back(new Ethernet);
-    // set_rx_interface returns a tx_interface that is paired 
-    host_to_connect->set_rx_interface(tx_interfaces.back());
-    host_to_connect->set_tx_interface(rx_interfaces.back());
-    connected_hosts.push_back(host_to_connect);
+
+    // set the interfaces for the port on the other end (note that their tx and rx
+    // are a mirror of this switch's tx and rx)
+    device_to_connect->set_port(rx_interfaces.back(), tx_interfaces.back());
 }
 
-int Switch::test_connection(int id) {
-    // check to see if the connection specified by the id number
-    // is indeed functioning by sending a PING. Note that actual switches
-    // would not verify that a connection is in place
-
-
+void Switch::set_port(Ethernet* tx_if, Ethernet* rx_if) {
+    // a port can be defined by its outgoing and incoming wires for the ethernet link
+    tx_interfaces.push_back(tx_if);
+    rx_interfaces.push_back(rx_if);
 }
 
 void Switch::run() {
-
-
-    // create main queue for communication of jobs between sending thread and receiving threads
-    // wqueue<Frame*> main_queue;
-    // start up sending thread with queue
+    // start up sending thread with this switch so that the thread can access the queue and
+    // tx interfaces
     std::thread tx_thread(&Switch::sender, this);
 
-    // start up receiving threads with queue and respective interface
+    // start up receiving threads which can also view the queue and rx interfaces, specifying
+    // which interface each thread should be concerned with
     for (int i = 0; i < rx_interfaces.size(); i++) {
         std::thread* rx_thread = new std::thread(&Switch::receiver, this, i);
         rx_thread_list.push_back(rx_thread);
@@ -103,6 +103,8 @@ void Switch::run() {
 }
 
 void Switch::print_routing_table() {
+    // show the current routining tabel for the switch as it has been learned
+    // by inspecting source mac addresses
     if (switch_table.size() > 0) {
         for (int i = 0; i < switch_table.size(); i++) {
             cout << switch_table.at(i)->address << " : " << switch_table.at(i)->interface_number << endl;
@@ -132,11 +134,13 @@ void Switch::sender() {
 }
 
 void Switch::unicast(Frame* tx_frame, int if_id) {
-    // no need to do anything fancy, wqueue takes care of mutexes and condition variables
+    // send one frame on a specific interface
 
 #ifdef DEBUG
     std::cout << setw(15) <<  "[Sender]" << ": sending frame out interface " << if_id << std::endl;
 #endif
+
+    // will block until that interface is free
     tx_interfaces.at(if_id)->transmit(tx_frame);
 }
 
@@ -149,7 +153,6 @@ void Switch::broadcast(Frame* tx_frame) {
         // this follows from the fact that a table entry for this frame's sender interface
         // must have ben added and thus we send to all other interfaces that have been added.
         if (get_table_interface_address(i) != tx_frame->get_src_mac()) {
-            // cout << name << ": sending on interface " << i << endl;
             unicast(tx_frame->copy(), i);
         }
     }
@@ -205,6 +208,8 @@ int Switch::get_table_interface_number(string mac_addr) {
 }
 
 std::string Switch::get_table_interface_address(int if_number) {
+    // returns the string address associated with this specific interface (this should be
+    // a list of mac addresses in the future since switches can be attached to switches)
     std::string result = "";
 
     if (switch_table.size() != 0) {
@@ -217,6 +222,9 @@ std::string Switch::get_table_interface_address(int if_number) {
 }
 
 void Switch::add_table_entry(std::string source_mac, int if_id) {
+    // add a new entry to the routing table that associates an interface id
+    // to the mac address
+
     TableEntry* new_entry = new TableEntry;
     new_entry->interface_number = if_id;
     new_entry->address = source_mac;

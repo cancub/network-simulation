@@ -31,6 +31,8 @@
 
 using namespace std;
 
+#define MAX_QUEUE_LENGTH 20
+
 template <typename T> class wqueue
 {
     list<T>             m_queue;
@@ -42,6 +44,7 @@ template <typename T> class wqueue
         wqueue() {
             m_mutex = new std::mutex;
             m_condv = new condition_variable;
+            max_entries = MAX_QUEUE_LENGTH;
         }
         ~wqueue() {
             delete m_mutex;
@@ -49,6 +52,12 @@ template <typename T> class wqueue
         }
         void add(T item) {
             std::unique_lock<std::mutex> lck(*m_mutex);
+
+            if (m_queue.size() >= max_entries) {
+                // simulate a dropped frame due to heavy traffic load
+                lck.unlock();
+                return;
+            }
             m_queue.push_back(item);
             m_condv->notify_one();
         }

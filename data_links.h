@@ -40,6 +40,4 @@ class Ethernet {
 
 class Air {};
 
-// create_star(Switch*, std::vector<Host*>);
-
 #endif

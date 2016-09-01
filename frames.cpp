@@ -1,6 +1,11 @@
 #include <string>
 #include "frames.h"
+#include <iostream>
 
+/*
+    Frames are the objects that will move around the network, being
+    created by a source host and delated by the receiving host
+*/
 
 Frame::Frame() {
     source_mac = "";
@@ -67,12 +72,6 @@ void Frame::erase() {
 }
 
 Frame* Frame::copy() {
-    Frame* frame_copy = new Frame();
-    frame_copy->set_src_ip(source_ip);
-    frame_copy->set_src_mac(source_mac);
-    frame_copy->set_dst_ip(destination_ip);
-    frame_copy->set_dst_mac(destination_mac);
-    frame_copy->set_frame_size(frame_size);
-
-    return frame_copy;
+    // sometimes a frame needs to be sent out multiple interfaces, so it will need to be copied
+    return new Frame(*this);
 }

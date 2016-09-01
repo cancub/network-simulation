@@ -23,7 +23,7 @@ class Switch {
         Switch(std::vector<Host*>, std::string);
         ~Switch();
         void plug_in_device(Host*);
-        int test_connection(int id);
+        void set_port(Ethernet*, Ethernet*);
         void run();
         void print_routing_table();
     private:

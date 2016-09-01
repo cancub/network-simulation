@@ -5,25 +5,25 @@
 #include <condition_variable> // std::condition_variable
 #include "wqueue.h"
 
-#define MAX_QUEUE_LENGTH 20
-
 Ethernet::Ethernet() {
-    //initialize both the interface and it's related mutex
+    //initialize a queue as the interface and set the maximum size of the queue to however
+    // many frames this interface can hold (in this case 1)
     interface = new wqueue<Frame*>;
-    interface->set_max_size(MAX_QUEUE_LENGTH);
+    interface->set_max_size(1);
 }
 
 Ethernet::~Ethernet() {
-    //get rid of the mutex and interface upon deletion
     delete interface;
 }
 
 
 void Ethernet::transmit(Frame* tx_frame) {
+	// wait on the interface to be cleared before sending a frame
 	interface->add(tx_frame);
 }
 
 Frame* Ethernet::receive() {
+	// wait for a signal to be received and then process the frames
 	return interface->remove();
 }
 

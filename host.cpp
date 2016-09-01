@@ -16,14 +16,18 @@
 using namespace std;
 
 #define POISSON 10 // the default lambda that we'll work with for now
+#define MTU     1500    // the maximum transmission unit describes how long a frame can be
+#define FRAME_SIZE_MIN 60  
+#define BROADCAST_MAC "FF:FF:FF:FF:FF:FF"
 
 // #define DEBUG
 #define TEST
+#define NUMBER_OF_FRAMES 10 // the number of frames to be sent by the host in a test
+
 
 Host::Host() {
     rx_frame_count = 0;
     frame_generator = new Poisson(POISSON);
-
     host_start_time = std::chrono::high_resolution_clock::now();
 }
 
@@ -36,27 +40,14 @@ Host::Host(std::string ip_addr, std::string mac_addr, std::string hostname) {
     host_start_time = std::chrono::high_resolution_clock::now();
 }
 
-// Host::Host(std::string ip_addr, std::string mac_addr, std::string hostname, 
-//     std::mutex* if_mutex, Frame* iface) {
-
-//     ip = ip_addr;
-//     mac = mac_addr;
-//     interface_mutex = if_mutex;
-//     interface = iface;
-//     rx_frame_count = 0;
-//     name = hostname;
-//     frame_generator = new Poisson(POISSON);
-//     host_start_time = std::chrono::high_resolution_clock::now();
-// }
-
 Host::~Host() {}
 
 void Host::run(std::vector<std::string>* mac_list) {
     // make the threads for the sending and receiving interfaces
-    // let them run
     std::thread receive_thread(&Host::receiver,this);
     std::thread send_thread(&Host::sender, this, mac_list);
 
+    // let them run
     receive_thread.join();
     send_thread.join();
 }
@@ -75,29 +66,25 @@ void Host::set_mac(std::string mac_addr) {
     mac = mac_addr;
 }
 
-void Host::set_rx_interface(Ethernet* rx_if) {
+void Host::set_port(Ethernet* tx_if, Ethernet* rx_if) {
+    // a port can be defined by its outgoing and incoming wires for the ethernet link
+    tx_interface = tx_if;
     rx_interface = rx_if;
 }
 
-void Host::set_tx_interface(Ethernet* tx_if) {
-    tx_interface = tx_if;
-}
-
 void Host::sender(std::vector<std::string>* mac_list) {
-    // this is to be run in a thread that will wait for a specific interarrival time
-    // before sending a frame. The sender then sets a condition variable, representing 
-    // the high voltage at the receiver end.
+    // this is to be run in a thread that will monitor the frame queue and
+    // then interact with a specific interface once a frame becomes available
+    // for sending
 
-    int delay_us;
-
-    int self_mac_element_id;
-
-    int receiver_mac_element_id;
-
-    int frame_size;
+    int delay_us;                   // the amount of time the host will wait in microseconds
+    int self_mac_element_id;        // the element of the mac list that contains this hosts's MAC
+    int receiver_mac_element_id;    // the element of the mac list that contains the receiving host's mac
+    int frame_size;                 // size of the frame being transmitted
 
     std::string dst_mac;
 
+    // find the self id in the mac list and remember the location
     for(int i = 0; i < mac_list->size(); i++) {
         if (mac.compare(mac_list->at(i)) == 0) {
             self_mac_element_id = i;
@@ -106,17 +93,30 @@ void Host::sender(std::vector<std::string>* mac_list) {
     }
 
 #ifdef TEST
-    for(int i = 0; i < 10; i++) {
+    for(int i = 0; i < NUMBER_OF_FRAMES; i++) {
 #else
     while(1) {
 #endif
-        receiver_mac_element_id = rand() % mac_list->size();
-        if (receiver_mac_element_id == self_mac_element_id) {
-            dst_mac = "FF:FF:FF:FF:FF:FF";
-            frame_size = 1;
-        } else {
-            dst_mac = mac_list->at(receiver_mac_element_id);
-            frame_size = (rand() % 1441) + 60;
+        // randomly select an element from the mac list
+        while (1) {
+            receiver_mac_element_id = rand() % mac_list->size();
+            if (receiver_mac_element_id == self_mac_element_id) {
+#ifdef TEST
+                // do not send to this same host
+                continue;
+#else
+                // send a broadcast frame if this host has selected its own MAC
+                dst_mac = "FF:FF:FF:FF:FF:FF";
+                frame_size = 1;
+                break;
+#endif
+            } else {
+                // get the mac address associated with this element
+                dst_mac = mac_list->at(receiver_mac_element_id);
+                // choose random frame size that exists in range of 
+                frame_size = (rand() % (MTU - FRAME_SIZE_MIN + 1)) + FRAME_SIZE_MIN;
+                break;
+            }
         }
 
         delay_us = frame_generator->interarrival_time()*1000000;
@@ -126,8 +126,7 @@ void Host::sender(std::vector<std::string>* mac_list) {
 #endif
         usleep(delay_us);
 
-        // now that the code is done waiting, it can attempt to send the frame.
-        // the frame will be between 60 and 1500 bytes.
+        // now that the sender is done waiting, it can attempt to send the frame.
         /*
         EDITOR'S NOTE: the frame size should be generated later on using probabilities
         related to REAL internet traffic. Maybe we could run a wireshark capture on a lab
@@ -147,37 +146,40 @@ void Host::receiver() {
     // this is to be run in a thread that will wait on a condition variable to check the rx
     // interface. 
     while (1) {
-        // consume:
         process_frame(rx_interface->receive());
     }
 
 }
 
 void Host::send_frame(int frame_size, std::string dst_mac) {
+    // a new frame is generated and is sent out on the link
     Frame* tx_frame = new Frame(mac, dst_mac,frame_size);
-    // tx_frame->set_src_mac(mac);
-    // tx_frame->set_dst_mac(dst_mac);
-    // tx_frame->set_frame_size(frame_size);
+
 #ifdef DEBUG
     host_print("sending " +std::to_string(frame_size) + " bytes to " + dst_mac);
 #endif
+    // and that frame is sent out on the link
     tx_interface->transmit(tx_frame);
 }
 
 void Host::process_frame(Frame* rx_frame) {
+    // the contents of received frames will be processed in this function
+
     std::chrono::duration<double> diff;
 
-    if (rx_frame->get_dst_mac() == mac) {
+    std::string dst_mac = rx_frame->get_dst_mac();
+
+    if (mac.compare(dst_mac) == 0) {
+        // this frame was destined for this host, so print some details about the frame
+
         diff = std::chrono::high_resolution_clock::now() - host_start_time;
-        // print some details about the frame
         increment_frame_count();
         std::string statement = std::to_string(get_frame_count()) + " " + std::to_string(diff.count()) 
                                 + " " + rx_frame->get_src_mac() + " " + std::to_string(rx_frame->get_frame_size());
         host_print(statement);
        
-        // host_print(std::to_string(get_frame_count()) + " " << mac + ": " + std::to_string(diff.count()) + " frame of "
-        //     + std::to_string(rx_interface->get_frame_size()) + " bytes received from " + rx_interface->get_src_mac());
-        // // get rid of the frame to signify that it was received
+    } else if (mac.compare(BROADCAST_MAC) == 0) {
+        host_print("Received broadcast frame from " + rx_frame->get_src_mac());
     } else {
         host_print("received frame for different desination mac: " + rx_frame->get_dst_mac());
     }
@@ -193,18 +195,8 @@ void Host::process_frame(Frame* rx_frame) {
 
 void Host::increment_frame_count() {
     rx_frame_count += 1;
-    // cout << rx_frame_count << endl;
 }
 
 void Host::host_print(std::string statement) {
     std::cout << setw(15) << name << ": " << statement << endl;
 }
-// int main(void) {
-
-//  Host alice("192.168.0.188", "aa:bb:cc:dd:ee:ff");
-//  std::mutex test_mutex;
-//  Frame interface;
-//  alice.set_mutex(&test_mutex);
-//  alice.set_interface(&interface);
-//  alice.run("00:11:22:33:44:55");
-// }

@@ -30,8 +30,7 @@ class Host{
         int get_frame_count();
         void set_ip(std::string);
         void set_mac(std::string);
-        void set_rx_interface(Ethernet*);
-        void set_tx_interface(Ethernet*);
+        void set_port(Ethernet*, Ethernet*);
         void sender(std::vector<std::string>*);
         void receiver();
     private:

@@ -31,26 +31,16 @@ int main(void) {
     Host alice(random_ip(), alice_mac, "alice");
     Host bob(random_ip(), bob_mac, "bob");
     Host carol(random_ip(), carol_mac, "carol");
-    Switch my_switch("star_switch");
+    Switch my_switch("switch1");
+    // Switch switch2("switch2");
 
     my_switch.plug_in_device(&alice);
     my_switch.plug_in_device(&bob);
     my_switch.plug_in_device(&carol);
 
-    // just try and connect one host to the other and see if that works
-
-    // for the purposes of naming conventions, we'll assume that alice is uplink from bob
-    // so that the 'downlink' interface is the one that bob is receiving on
-
-    // test 1
-    // Ethernet* downlink = new Ethernet;
-    // Ethernet* uplink = new Ethernet;
-
-    // alice.set_tx_interface(downlink);
-    // bob.set_rx_interface(downlink);
-
-    // alice.set_rx_interface(uplink);
-    // bob.set_tx_interface(uplink);
+    // try to connect two switches now
+    // plug in device should exchange interfaces
+    // rx_interface = other_switch.set_tx_interface();
 
     std::thread test_switch(&Switch::run, &my_switch);
     std::thread test_alice(&Host::run,&alice, &mac_list);
