@@ -38,7 +38,6 @@ class Host{
         // should split the above to unicast and broadcast (maybe multicast?)
         void process_frame(Frame*); // process an incoming frames
         void increment_frame_count();
-        void mutex_sleep(); // sleep a random amount of microseconds so that there's less problems
         void host_print(std::string);
         Poisson* frame_generator; // the object that will create all the interarrival times
         Ethernet* rx_interface; // the location where the frames will be found/put on

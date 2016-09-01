@@ -35,7 +35,7 @@ class Ethernet {
         void transmit(Frame*);
         Frame* receive();
     private:
-        wqueue* interface;
+        wqueue<Frame*>* interface;
 };
 
 class Air {};

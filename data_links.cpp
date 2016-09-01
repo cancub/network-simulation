@@ -1,13 +1,16 @@
 #include <mutex>
+#include <iostream>
 #include "data_links.h"
 #include "frames.h"
 #include <condition_variable> // std::condition_variable
 #include "wqueue.h"
 
+#define MAX_QUEUE_LENGTH 20
+
 Ethernet::Ethernet() {
     //initialize both the interface and it's related mutex
-    interface = new wqueue;
-    interface->set_max_size(1);
+    interface = new wqueue<Frame*>;
+    interface->set_max_size(MAX_QUEUE_LENGTH);
 }
 
 Ethernet::~Ethernet() {

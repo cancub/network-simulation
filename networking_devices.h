@@ -2,41 +2,47 @@
 #define NETWORKING_DEVICES_H
 
 #include <vector>
+#include <thread>
 #include <string>
 #include <mutex>
 #include "frames.h"
 #include "host.h"
+#include <condition_variable> // std::condition_variable
+#include "wqueue.h"
 
 class TableEntry {
-	public:
-		std::string address;
-		int interface_number;
+    public:
+        std::string address;
+        int interface_number;
 };
 
 class Switch {
-	public:
-		Switch();
-		Switch(std::string);
-		Switch(std::vector<Host*>, std::string);
-		~Switch();
-		void plug_in_device(Host*);
-		void run();
-		void print_routing_table();
-	private:
-		void process_frame(int);
-		void send_frame(int);
-		void unicast(int);
-		void broadcast();
-		void mutex_sleep();
-		int get_table_interface_number(std::string);
-		std::string get_table_interface_address(int);
-		void add_table_entry(std::string, int);
-		std::vector<Host*> connected_hosts;
-		std::vector<Frame*> interfaces;
-		std::vector<std::mutex*> interface_mutexes;
-		std::vector<TableEntry*> switch_table;
-		Frame* frame_copy; // will need to turn into a queue
-		std::string name;
+    public:
+        Switch();
+        Switch(std::string);
+        Switch(std::vector<Host*>, std::string);
+        ~Switch();
+        void plug_in_device(Host*);
+        int test_connection(int id);
+        void run();
+        void print_routing_table();
+    private:
+        void sender();
+        void unicast(Frame*, int);
+        void broadcast(Frame*);
+        void receiver(int);
+        void process_frame(Frame*);
+        int get_table_interface_number(std::string);
+        std::string get_table_interface_address(int);
+        void add_table_entry(std::string);
+        int total_ifs;
+        std::vector<Host*> connected_hosts;
+        std::vector<Ethernet*> rx_interfaces;
+        std::vector<Ethernet*> tx_interfaces;
+        std::vector<TableEntry*> switch_table;
+        std::vector<std::thread*> rx_thread_list;
+        wqueue<Frame*>* frame_queue;
+        std::string name;
 };
 
 // class Router {

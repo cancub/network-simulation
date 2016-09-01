@@ -17,7 +17,7 @@ using namespace std;
 
 #define POISSON 10 // the default lambda that we'll work with for now
 
-// #define DEBUG
+#define DEBUG
 
 Host::Host() {
     rx_frame_count = 0;
@@ -53,7 +53,6 @@ Host::~Host() {}
 void Host::run(std::string dst_mac) {
     // make the threads for the sending and receiving interfaces
     // let them run
-
     std::thread receive_thread(&Host::receiver,this);
     std::thread send_thread(&Host::sender, this, dst_mac);
 
@@ -159,12 +158,8 @@ void Host::increment_frame_count() {
     // cout << rx_frame_count << endl;
 }
 
-void Host::mutex_sleep() {
-    usleep(rand() % 100);
-}
-
 void Host::host_print(std::string statement) {
-    std::cout << setw(10) << name << ": " << statement << endl;
+    std::cout << setw(15) << name << ": " << statement << endl;
 }
 // int main(void) {
 

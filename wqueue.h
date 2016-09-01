@@ -31,9 +31,9 @@
 
 using namespace std;
 
-class wqueue
+template <typename T> class wqueue
 {
-    list<Frame*>             m_queue;
+    list<T>             m_queue;
     std::mutex*              m_mutex;
     condition_variable*      m_condv; 
     int max_entries;
@@ -47,18 +47,18 @@ class wqueue
             delete m_mutex;
             // delete m_condv;
         }
-        void add(Frame* item) {
+        void add(T item) {
             std::unique_lock<std::mutex> lck(*m_mutex);
             m_queue.push_back(item);
             m_condv->notify_one();
         }
-        Frame* remove() {
+        T remove() {
             std::unique_lock<std::mutex> lck(*m_mutex);
             if (m_queue.size() == 0) {
                 m_condv->wait(lck);
             }
 
-            Frame* item = m_queue.front();
+            T item = m_queue.front();
             m_queue.pop_front();
             return item;
         }
