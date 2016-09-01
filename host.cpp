@@ -20,7 +20,7 @@ using namespace std;
 #define FRAME_SIZE_MIN 60  
 #define BROADCAST_MAC "FF:FF:FF:FF:FF:FF"
 
-// #define DEBUG
+#define DEBUG
 #define TEST
 #define NUMBER_OF_FRAMES 10 // the number of frames to be sent by the host in a test
 
@@ -29,6 +29,8 @@ Host::Host() {
     rx_frame_count = 0;
     frame_generator = new Poisson(POISSON);
     host_start_time = std::chrono::high_resolution_clock::now();
+    name = "unnamed";
+    host_print("Online");
 }
 
 Host::Host(std::string ip_addr, std::string mac_addr, std::string hostname) {
@@ -38,6 +40,7 @@ Host::Host(std::string ip_addr, std::string mac_addr, std::string hostname) {
     name = hostname;
     frame_generator = new Poisson(POISSON);
     host_start_time = std::chrono::high_resolution_clock::now();
+    host_print("Online with MAC " + mac);
 }
 
 Host::~Host() {}
@@ -184,13 +187,7 @@ void Host::process_frame(Frame* rx_frame) {
         host_print("received frame for different desination mac: " + rx_frame->get_dst_mac());
     }
 
-#ifdef DEBUG 
-    host_print("deleting frame");
-#endif
     delete rx_frame;
-#ifdef DEBUG 
-    host_print("frame deleted");
-#endif
 }
 
 void Host::increment_frame_count() {

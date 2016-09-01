@@ -25,7 +25,7 @@ using namespace std;
 #define NUMBER_OF_INTERFACES 6      // the assumed number of physical interfaces the switch has 
 
 
-// #define DEBUG
+#define DEBUG
 
 Switch::Switch() {
     rx_interfaces.reserve(NUMBER_OF_INTERFACES);
@@ -33,7 +33,8 @@ Switch::Switch() {
     switch_table.reserve(NUMBER_OF_INTERFACES);
     rx_thread_list.reserve(NUMBER_OF_INTERFACES);
     frame_queue = new wqueue<Frame*>;
-    total_ifs = 0;
+    name = "unnamed";
+    switch_print("Online");
 }
 
 Switch::Switch(std::string switch_name) {
@@ -43,7 +44,7 @@ Switch::Switch(std::string switch_name) {
     rx_thread_list.reserve(NUMBER_OF_INTERFACES);
     frame_queue = new wqueue<Frame*>;
     name = switch_name;
-    total_ifs = 0;
+    switch_print("Online");
 }
 
 Switch::Switch(std::vector<Host*> hosts_to_connect, std::string switch_name) {
@@ -53,7 +54,7 @@ Switch::Switch(std::vector<Host*> hosts_to_connect, std::string switch_name) {
     rx_thread_list.reserve(NUMBER_OF_INTERFACES);
     frame_queue = new wqueue<Frame*>;
     name = switch_name;
-    total_ifs = 0;
+    switch_print("Online");
 }
 
 Switch::~Switch() {
@@ -65,6 +66,20 @@ Switch::~Switch() {
 }
 
 void Switch::plug_in_device(Host* device_to_connect) {
+    // when notified that a device has been plugged in,
+    // the switch creates a new rx and tx interface that it associates with that
+    // n'th port and provides those interfaces to the device that was
+    // just connected
+
+    tx_interfaces.push_back(new Ethernet);
+    rx_interfaces.push_back(new Ethernet);
+
+    // set the interfaces for the port on the other end (note that their tx and rx
+    // are a mirror of this switch's tx and rx)
+    device_to_connect->set_port(rx_interfaces.back(), tx_interfaces.back());
+}
+
+void Switch::plug_in_device(Switch* device_to_connect) {
     // when notified that a device has been plugged in,
     // the switch creates a new rx and tx interface that it associates with that
     // n'th port and provides those interfaces to the device that was
@@ -102,16 +117,6 @@ void Switch::run() {
     }
 }
 
-void Switch::print_routing_table() {
-    // show the current routining tabel for the switch as it has been learned
-    // by inspecting source mac addresses
-    if (switch_table.size() > 0) {
-        for (int i = 0; i < switch_table.size(); i++) {
-            cout << switch_table.at(i)->address << " : " << switch_table.at(i)->interface_number << endl;
-        }
-
-    }
-}
 
 void Switch::sender() {
     Frame* tx_frame;    // pointer to the frame to be sent out
@@ -137,7 +142,7 @@ void Switch::unicast(Frame* tx_frame, int if_id) {
     // send one frame on a specific interface
 
 #ifdef DEBUG
-    std::cout << setw(15) <<  "[Sender]" << ": sending frame out interface " << if_id << std::endl;
+    switch_print("Transmitting frame on interface " + std::to_string(if_id));
 #endif
 
     // will block until that interface is free
@@ -152,27 +157,20 @@ void Switch::broadcast(Frame* tx_frame) {
         // send on that interface. if it isn't in the table, send on that interface as well.
         // this follows from the fact that a table entry for this frame's sender interface
         // must have ben added and thus we send to all other interfaces that have been added.
-        if (get_table_interface_address(i) != tx_frame->get_src_mac()) {
+        if (get_table_interface_number(tx_frame->get_src_mac()) != i) {
             unicast(tx_frame->copy(), i);
         }
     }
-#ifdef DEBUG
-    cout << "switch deleting tx frame" << endl;
-#endif
     delete tx_frame;
-#ifdef DEBUG
-    cout << "tx frame deleted" << endl;
-#endif
 }
 
 void Switch::receiver(int if_id) {
     Frame* rx_frame;
-    string RxName = "[Receiver" + to_string(if_id) + "]";
     // continually loop in trying to obtain a new frame from the medium
     while (1) {
         rx_frame = rx_interfaces.at(if_id)->receive();
 #ifdef DEBUG
-        std::cout << setw(15) << RxName << ": received frame" << std::endl;
+        switch_print("Frame received on interface " + std::to_string(if_id));
 #endif
         process_frame(rx_frame, if_id);
     }
@@ -197,27 +195,19 @@ int Switch::get_table_interface_number(string mac_addr) {
     // of note is that an interface can be associated with many devices, something that will
     // have to be updated in the code when we move to a true network format
     int result = -1;
-    if (switch_table.size() != 0) {
-        for (int i = 0; i < switch_table.size(); i++) {
-            if ((switch_table.at(i))->address == mac_addr)
-                result = (switch_table.at(i))->interface_number;
-        }
-    }
-
-    return result;
-}
-
-std::string Switch::get_table_interface_address(int if_number) {
-    // returns the string address associated with this specific interface (this should be
-    // a list of mac addresses in the future since switches can be attached to switches)
-    std::string result = "";
 
     if (switch_table.size() != 0) {
         for (int i = 0; i < switch_table.size(); i++) {
-            if ((switch_table.at(i))->interface_number == if_number)
-                result = (switch_table.at(i))->address;
+
+            for (std::vector<std::string>::iterator it = switch_table.at(i)->address_list.begin();
+                it != switch_table.at(i)->address_list.end(); ++it){                
+                if (mac_addr.compare(*it) == 0) {
+                    return (switch_table.at(i))->interface_number;
+                }
+            }
         }
     }
+
     return result;
 }
 
@@ -225,12 +215,41 @@ void Switch::add_table_entry(std::string source_mac, int if_id) {
     // add a new entry to the routing table that associates an interface id
     // to the mac address
 
+    // search existing table to see if this interface exists in the table
+    // and add the mac to the address list for this interface if it does
+    for (int i = 0; i < switch_table.size(); i++) {
+        if (switch_table.at(i)->interface_number == if_id) {
+            switch_table.at(i)->address_list.push_back(source_mac);
+            return;
+        }
+    }
+
+    // otherwise crease a new entry to the table
     TableEntry* new_entry = new TableEntry;
     new_entry->interface_number = if_id;
-    new_entry->address = source_mac;
+    new_entry->address_list.push_back(source_mac);
     switch_table.push_back(new_entry);
 #ifdef DEBUG
-    std::cout << "table entry added for " << source_mac << std::endl;
+    switch_print("Table entry added for " + source_mac);
     print_routing_table();
 #endif
+}
+
+void Switch::print_routing_table() {
+    // show the current routining tabel for the switch as it has been learned
+    // by inspecting source mac addresses
+    if (switch_table.size() > 0) {
+        switch_print("***************************");
+        for (int i = 0; i < switch_table.size(); i++) {
+            for (std::vector<std::string>::iterator it = switch_table.at(i)->address_list.begin();
+                it != switch_table.at(i)->address_list.end(); ++it) {
+                switch_print(std::to_string(switch_table.at(i)->interface_number) + " : " + *it);
+            }
+        }
+        switch_print("***************************");
+    }
+}
+
+void Switch::switch_print(std::string statement) {
+    std::cout << setw(15) << name << ": " << statement << endl;
 }

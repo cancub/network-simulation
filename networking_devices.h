@@ -12,7 +12,7 @@
 
 class TableEntry {
     public:
-        std::string address;
+        std::vector<std::string> address_list;
         int interface_number;
 };
 
@@ -23,6 +23,7 @@ class Switch {
         Switch(std::vector<Host*>, std::string);
         ~Switch();
         void plug_in_device(Host*);
+        void plug_in_device(Switch*);
         void set_port(Ethernet*, Ethernet*);
         void run();
         void print_routing_table();
@@ -33,9 +34,8 @@ class Switch {
         void receiver(int);
         void process_frame(Frame*, int);
         int get_table_interface_number(std::string);
-        std::string get_table_interface_address(int);
         void add_table_entry(std::string, int);
-        int total_ifs;
+        void switch_print(std::string);
         std::vector<Host*> connected_hosts;
         std::vector<Ethernet*> rx_interfaces;
         std::vector<Ethernet*> tx_interfaces;
