@@ -127,7 +127,7 @@ void Host::sender(std::vector<std::string>* mac_list) {
             }
         }
 
-        delay_us = frame_generator->interarrival_time()*1000000;
+        delay_us = frame_generator->interarrival_time_us();
 
 #ifdef DEBUG 
         host_print("waiting " + std::to_string(delay_us/1000) + " ms");

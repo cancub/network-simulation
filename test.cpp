@@ -107,5 +107,5 @@ void multiple_switch_test(int number_of_hosts, int number_of_switches) {
 int main(void) {
     srand (time(NULL));
 
-    multiple_switch_test(10,3);
+    multiple_switch_test(2,1);
 }

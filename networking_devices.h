@@ -53,9 +53,12 @@ class Switch {
 
 // };
 
-// class Gateway {
+class Gateway : public Switch {
+    public:
+        Gateway();
+    private:
 
-// };
+};
 
 // class AccessPoint {
 
