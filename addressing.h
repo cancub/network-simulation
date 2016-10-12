@@ -5,9 +5,13 @@
 // #include <iostream>
 // #include <vector>
 #include <string>
+#include <cstdint>
 
-std::string random_mac();
-std::string uniform_mac(std::string);
-std::string random_ip();
+std::vector<uint8_t> random_mac();
+std::vector<uint8_t> uniform_mac(uint8_t);
+std::vector<uint8_t> random_ip();
+std::vector<uint8_t> uniform_ip(uint8_t);
+std::string mac_to_string(std::vector<uint8_t>);
+std::string ip_to_string(std::vector<uint8_t>);
 
 #endif
