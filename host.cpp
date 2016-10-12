@@ -11,7 +11,9 @@
 #include "frame_generators.h"
 #include "frames.h"
 #include <iomanip>
+#include <cstdint>
 #include "data_links.h"
+#include "addressing.h"
 
 using namespace std;
 
@@ -35,7 +37,7 @@ Host::Host() {
 #endif
 }
 
-Host::Host(std::string ip_addr, std::string mac_addr, std::string hostname) {
+Host::Host(std::vector<uint8_t> ip_addr, std::vector<uint8_t> mac_addr, std::string hostname) {
     ip = ip_addr;
     mac = mac_addr;
     rx_frame_count = 0;
@@ -50,7 +52,7 @@ Host::Host(std::string ip_addr, std::string mac_addr, std::string hostname) {
 
 Host::~Host() {}
 
-void Host::run(std::vector<std::string>* mac_list) {
+void Host::run(std::vector<std::vector<uint8_t>>* mac_list) {
     // make the threads for the sending and receiving interfaces
     std::thread receive_thread(&Host::receiver,this);
     std::thread send_thread(&Host::sender, this, mac_list);
@@ -60,17 +62,17 @@ void Host::run(std::vector<std::string>* mac_list) {
     send_thread.join();
 }
 
-std::string Host::get_ip() {return ip;}
+std::vector<uint8_t> Host::get_ip() {return ip;}
 
-std::string Host::get_mac() {return mac;}
+std::vector<uint8_t> Host::get_mac() {return mac;}
 
 int Host::get_frame_count() {return rx_frame_count;}
 
-void Host::set_ip(std::string ip_addr) {
+void Host::set_ip(std::vector<uint8_t> ip_addr) {
     ip = ip_addr;
 }
 
-void Host::set_mac(std::string mac_addr) {
+void Host::set_mac(std::vector<uint8_t> mac_addr) {
     mac = mac_addr;
 }
 
@@ -80,7 +82,7 @@ void Host::set_port(Ethernet* tx_if, Ethernet* rx_if) {
     rx_interface = rx_if;
 }
 
-void Host::sender(std::vector<std::string>* mac_list) {
+void Host::sender(std::vector<std::vector<uint8_t>>* mac_list) {
     // this is to be run in a thread that will monitor the frame queue and
     // then interact with a specific interface once a frame becomes available
     // for sending
@@ -90,11 +92,11 @@ void Host::sender(std::vector<std::string>* mac_list) {
     int receiver_mac_element_id;    // the element of the mac list that contains the receiving host's mac
     int frame_size;                 // size of the frame being transmitted
 
-    std::string dst_mac;
+    std::vector<uint8_t> dst_mac;
 
     // find the self id in the mac list and remember the location
     for(int i = 0; i < mac_list->size(); i++) {
-        if (mac.compare(mac_list->at(i)) == 0) {
+        if (compare_macs(mac, mac_list->at(i)) == 0) {
             self_mac_element_id = i;
             break;
         }
@@ -114,7 +116,7 @@ void Host::sender(std::vector<std::string>* mac_list) {
                 continue;
 #else
                 // send a broadcast frame if this host has selected its own MAC
-                dst_mac = BROADCAST_MAC;
+                dst_mac = broadcast_mac();
                 frame_size = 1;
                 break;
 #endif
@@ -159,7 +161,7 @@ void Host::receiver() {
 
 }
 
-void Host::send_frame(int frame_size, std::string dst_mac) {
+void Host::send_frame(int frame_size, std::vector<uint8_t> dst_mac) {
     // a new frame is generated and is sent out on the link
     Frame* tx_frame = new Frame(mac, dst_mac,frame_size);
 
@@ -175,21 +177,22 @@ void Host::process_frame(Frame* rx_frame) {
 
     std::chrono::duration<double> diff;
 
-    std::string dst_mac = rx_frame->get_dst_mac();
+    std::vector<uint8_t> dst_mac = rx_frame->get_dst_mac();
 
-    if (dst_mac.compare(mac) == 0) {
+    if (compare_macs(dst_mac,mac) == 0) {
         // this frame was destined for this host, so print some details about the frame
 
         diff = std::chrono::high_resolution_clock::now() - host_start_time;
         increment_frame_count();
         std::string statement = std::to_string(get_frame_count()) + " " + std::to_string(diff.count()) 
-                                + " " + rx_frame->get_src_mac() + " " + std::to_string(rx_frame->get_frame_size());
+                                + " " + mac_to_string(rx_frame->get_src_mac())
+                                 + " " + std::to_string(rx_frame->get_frame_size());
         host_print(statement);
        
-    } else if (dst_mac.compare(BROADCAST_MAC) == 0) {
-        host_print("Received broadcast frame from " + rx_frame->get_src_mac());
+    } else if (is_broadcast(dst_mac) == 0) {
+        host_print("Received broadcast frame from " + mac_to_string(rx_frame->get_src_mac()));
     } else {
-        host_print("received frame for different desination mac: " + rx_frame->get_dst_mac());
+        host_print("received frame for different desination mac: " + mac_to_string(rx_frame->get_dst_mac()));
     }
 
     delete rx_frame;

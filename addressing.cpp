@@ -108,6 +108,9 @@ std::string mac_to_string(std::vector<uint8_t> mac_addr){
 
     std::ostringstream convert;
     for (int i = 0; i < 6; i++) {
+        if (mac_addr[i] < 16) {
+            convert << "0";
+        }
         convert << std::uppercase << std::hex << (int)mac_addr[i];
         if (i < 5) {
             convert << ":";

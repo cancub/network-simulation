@@ -10,6 +10,7 @@
 #include "data_links.h"
 #include <iomanip>
 #include "wqueue.h"
+#include "addressing.h"
 
 /*
 This switch class is for conencting to other switches and hosts for relaying frames.
@@ -133,7 +134,7 @@ void Switch::sender() {
         } else {
             // send to all interfaces
 #ifdef DEBUG
-            switch_print("Cannot find host MAC in routing table: " + tx_frame->get_dst_mac());
+            switch_print("Cannot find host MAC in routing table: " + mac_to_string(tx_frame->get_dst_mac()));
 #endif
             broadcast(tx_frame);
         }  
@@ -192,7 +193,7 @@ void Switch::process_frame(Frame* rx_frame, int in_if) {
 
 }
 
-int Switch::get_table_interface_number(string mac_addr) {
+int Switch::get_table_interface_number(std::vector<uint8_t> mac_addr) {
     // obtain the interface number associatd with this device.
     // of note is that an interface can be associated with many devices, something that will
     // have to be updated in the code when we move to a true network format
@@ -201,9 +202,9 @@ int Switch::get_table_interface_number(string mac_addr) {
     if (switch_table.size() != 0) {
         for (int i = 0; i < switch_table.size(); i++) {
 
-            for (std::vector<std::string>::iterator it = switch_table.at(i)->address_list.begin();
+            for (std::vector<std::vector<uint8_t>>::iterator it = switch_table.at(i)->address_list.begin();
                 it != switch_table.at(i)->address_list.end(); ++it){                
-                if (mac_addr.compare(*it) == 0) {
+                if (compare_macs(mac_addr,*it) == 0) {
                     return (switch_table.at(i))->interface_number;
                 }
             }
@@ -213,7 +214,7 @@ int Switch::get_table_interface_number(string mac_addr) {
     return result;
 }
 
-void Switch::add_table_entry(std::string source_mac, int if_id) {
+void Switch::add_table_entry(std::vector<uint8_t> source_mac, int if_id) {
     // add a new entry to the routing table that associates an interface id
     // to the mac address
 
@@ -243,9 +244,10 @@ void Switch::print_routing_table() {
     if (switch_table.size() > 0) {
         switch_print("***************************");
         for (int i = 0; i < switch_table.size(); i++) {
-            for (std::vector<std::string>::iterator it = switch_table.at(i)->address_list.begin();
+            for (std::vector<std::vector<uint8_t>>::iterator it = switch_table.at(i)->address_list.begin();
                 it != switch_table.at(i)->address_list.end(); ++it) {
-                switch_print(std::to_string(switch_table.at(i)->interface_number) + " : " + *it);
+                switch_print(std::to_string(switch_table.at(i)->interface_number) + " : " + 
+                    mac_to_string(*it));
             }
         }
         switch_print("***************************");
@@ -255,3 +257,7 @@ void Switch::print_routing_table() {
 void Switch::switch_print(std::string statement) {
     std::cout << setw(15) << name << ": " << statement << endl;
 }
+
+
+
+

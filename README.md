@@ -39,6 +39,8 @@ COMPLETED WORK:
 --------------------------------------------------------------------------------
 CURRENT WORK:
 
+- switch ip and mac addresses from string to array of uint8_t
+
 - begin to build up network layer
 	- stations must obtain an IP
 	- set up basic ip frames such as bootp, icmp, arp

@@ -11,6 +11,7 @@
 #include "networking_devices.h"
 #include <condition_variable> // std::condition_variable
 #include <list>
+#include <cstdint>
 
 using namespace std;
 
@@ -45,11 +46,12 @@ std::string name_list[26] = {
 
 void multiple_switch_test(int number_of_hosts, int number_of_switches) {
 
-    std::vector<std::string> mac_addresses;
+    std::vector<std::vector<uint8_t>> mac_addresses;
     std::vector<Switch*> switches;
     std::vector<Host*> hosts;
     std::vector<std::thread*> switch_threads;
     std::vector<std::thread*> host_threads;
+    uint8_t mac_byte;
 
     for (int i = 0; i < number_of_switches; i++) {
         Switch* new_switch = new Switch("Switch" + std::to_string(i));
@@ -65,7 +67,8 @@ void multiple_switch_test(int number_of_hosts, int number_of_switches) {
     }
 
     for (int i = 0; i < number_of_hosts; i++){
-        mac_addresses.push_back(uniform_mac(std::to_string(i)));
+        mac_byte = (uint8_t)i;
+        mac_addresses.push_back(uniform_mac(mac_byte));
         Host* new_host = new Host(random_ip(), mac_addresses.back(), name_list[i]);
         int target_switch = rand() % switches.size();
         switches.at(target_switch)->plug_in_device(new_host);

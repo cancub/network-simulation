@@ -7,12 +7,13 @@
 #include <mutex>
 #include "frames.h"
 #include "host.h"
+#include <cstdint>
 #include <condition_variable> // std::condition_variable
 #include "wqueue.h"
 
 class TableEntry {
     public:
-        std::vector<std::string> address_list;
+        std::vector<std::vector<uint8_t>> address_list;
         int interface_number;
 };
 
@@ -33,8 +34,8 @@ class Switch {
         void broadcast(Frame*);
         void receiver(int);
         void process_frame(Frame*, int);
-        int get_table_interface_number(std::string);
-        void add_table_entry(std::string, int);
+        int get_table_interface_number(std::vector<uint8_t>);
+        void add_table_entry(std::vector<uint8_t>, int);
         void switch_print(std::string);
         std::vector<Host*> connected_hosts;
         std::vector<Ethernet*> rx_interfaces;
@@ -45,20 +46,31 @@ class Switch {
         std::string name;
 };
 
-// class Router {
+class Router {
+    public:
+        Router();        
+    private:
+        std::string formulate_ACK();
+        void receiver();
+        void sender();
 
-// };
+};
+
+class DHCPServer {
+
+};
 
 // class Hub {
 
 // };
 
-class Gateway : public Switch {
-    public:
-        Gateway();
-    private:
+// class Gateway : public Switch {
+//     public:
+//         Gateway();
+//         void set_
+//     private:
 
-};
+// };
 
 // class AccessPoint {
 
