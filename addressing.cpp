@@ -56,6 +56,26 @@ std::vector<uint8_t> uniform_ip(uint8_t ip_byte) {
     return result;
 }
 
+int compare_macs(std::vector<uint8_t> mac1, std::vector<uint8_t> mac2) {
+    int result = 0;
+    for (int i = 0; i < 6; i++){
+        if (mac1[i] != mac2[i]){
+            return 1;
+        }
+    }
+    return result;
+}
+
+int compare_ips(std::vector<uint8_t> ip1, std::vector<uint8_t> ip2) {
+    int result = 0;
+    for (int i = 0; i < 6; i++){
+        if (ip1[i] != ip2[i]){
+            return 1;
+        }
+    }
+    return result;
+}
+
 std::string mac_to_string(std::vector<uint8_t> mac_addr){
 
     std::ostringstream convert;
@@ -83,16 +103,18 @@ std::string ip_to_string(std::vector<uint8_t> ip_addr){
 }
 
 
-// int main() {
+int main() {
 
-//     srand(time(NULL));
-//     std::vector<uint8_t> my_mac;
-//     std::vector<uint8_t> my_ip;
-//     uint8_t byte = 45;
-//     my_mac = uniform_mac(byte);
-//     my_ip = random_ip();
+    srand(time(NULL));
+    std::vector<uint8_t> my_mac1;
+    std::vector<uint8_t> my_mac2;
+    std::vector<uint8_t> my_mac3;
+    uint8_t byte = 45;
+    my_mac1 = uniform_mac(byte);
+    my_mac2 = uniform_mac(byte);
+    my_mac3 = random_mac();
 
-//     cout << mac_to_string(my_mac) << " " << ip_to_string(my_ip) << endl;
+    cout << compare_macs(my_mac1,my_mac2) << " " << compare_macs(my_mac1,my_mac3) << endl;
 
-//     return 0;
-// }
+    return 0;
+}
