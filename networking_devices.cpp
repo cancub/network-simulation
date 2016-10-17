@@ -5,12 +5,13 @@
 #include <unistd.h>
 #include "networking_devices.h"
 #include "host.h"
-#include "frames.h"
+#include "pdu.h"
 #include <condition_variable> // std::condition_variable
 #include "data_links.h"
 #include <iomanip>
 #include "wqueue.h"
 #include "addressing.h"
+#include <ctime>
 
 /*
 This switch class is for conencting to other switches and hosts for relaying frames.
@@ -32,7 +33,7 @@ Switch::Switch() {
     tx_interfaces.reserve(NUMBER_OF_INTERFACES);
     switch_table.reserve(NUMBER_OF_INTERFACES);
     rx_thread_list.reserve(NUMBER_OF_INTERFACES);
-    frame_queue = new wqueue<Frame*>;
+    frame_queue = new wqueue<MPDU*>;
     name = "unnamed";
     switch_print("Online");
 }
@@ -42,7 +43,7 @@ Switch::Switch(std::string switch_name) {
     tx_interfaces.reserve(NUMBER_OF_INTERFACES);
     switch_table.reserve(NUMBER_OF_INTERFACES);
     rx_thread_list.reserve(NUMBER_OF_INTERFACES);
-    frame_queue = new wqueue<Frame*>;
+    frame_queue = new wqueue<MPDU*>;
     name = switch_name;
     switch_print("Online");
 }
@@ -52,7 +53,7 @@ Switch::Switch(std::vector<Host*> hosts_to_connect, std::string switch_name) {
     tx_interfaces.reserve(NUMBER_OF_INTERFACES);
     switch_table.reserve(NUMBER_OF_INTERFACES);
     rx_thread_list.reserve(NUMBER_OF_INTERFACES);
-    frame_queue = new wqueue<Frame*>;
+    frame_queue = new wqueue<MPDU*>;
     name = switch_name;
     switch_print("Online");
 }
@@ -63,6 +64,7 @@ Switch::~Switch() {
         delete rx_interfaces.at(i);
         delete tx_interfaces.at(i);
     }
+    delete frame_queue;
 }
 
 void Switch::plug_in_device(Host* device_to_connect) {
@@ -119,7 +121,7 @@ void Switch::run() {
 
 
 void Switch::sender() {
-    Frame* tx_frame;    // pointer to the frame to be sent out
+    MPDU* tx_frame;    // pointer to the frame to be sent out
     int if_id;          // the id of the interface that is sending the frame
 
     // continually check queue for frames
@@ -141,7 +143,7 @@ void Switch::sender() {
     }
 }
 
-void Switch::unicast(Frame* tx_frame, int if_id) {
+void Switch::unicast(MPDU* tx_frame, int if_id) {
     // send one frame on a specific interface
 
 #ifdef DEBUG
@@ -152,7 +154,7 @@ void Switch::unicast(Frame* tx_frame, int if_id) {
     tx_interfaces.at(if_id)->transmit(tx_frame);
 }
 
-void Switch::broadcast(Frame* tx_frame) {
+void Switch::broadcast(MPDU* tx_frame) {
     // send frames on all interfaces except the in interface, in_if
     for (int i = 0; i < tx_interfaces.size(); i++) {
         // check if interface number, i, is in one of the TableEntry 
@@ -168,7 +170,7 @@ void Switch::broadcast(Frame* tx_frame) {
 }
 
 void Switch::receiver(int if_id) {
-    Frame* rx_frame;
+    MPDU* rx_frame;
     // continually loop in trying to obtain a new frame from the medium
     while (1) {
         rx_frame = rx_interfaces.at(if_id)->receive();
@@ -179,7 +181,7 @@ void Switch::receiver(int if_id) {
     }
 }
 
-void Switch::process_frame(Frame* rx_frame, int in_if) {
+void Switch::process_frame(MPDU* rx_frame, int in_if) {
     // add the frame to the queue of frames to be transmitted
     // check to see if the sending device is listed and add the device to the i/f table if its not there
     int if_id = get_table_interface_number(rx_frame->get_src_mac());
@@ -261,3 +263,106 @@ void Switch::switch_print(std::string statement) {
 
 
 
+
+
+
+
+Router::Router() {
+    main_dhcp = new DHCPServer(frame_queue, create_ip(192,168,0,0), 24, create_ip(192.168.0.4));
+}      
+
+Router::Router(uint32_t subnet_ip, uint32_t netmask, uint32_t DNS_ip){
+    main_dhcp = new DHCPServer(frame_queue, subnet_ip, netmask, DNS_ip);
+}
+
+std::string Router::formulate_ACK(){
+
+}
+
+void Router::receiver() {
+
+}
+
+void Router::sender(){
+
+}
+
+
+
+
+
+
+
+
+
+DHCPServer::DHCPServer(wqueue<MPDU*>* router_queue)  {
+    tx_queue = router_queue;
+    subnet_ip = create_ip(192,168,0,0);
+    netmask = create_ip(255,255,255,0);
+    DNS_server = create_ip(192,168,0,4);
+}
+
+DHCPServer::DHCPServer(wqueue<MPDU*>* router_queue, uint32_t IP, uint32_t mask) {
+    tx_queue = router_queue;
+    subnet_ip = IP;
+    netmask = mask;
+    DNS_server = create_ip(192,168,0,4);
+}
+
+DHCPServer::DHCPServer(wqueue<MPDU*>* router_queue, uint32_t IP, uint32_t mask, uint32_t dns) {
+    tx_queue = router_queue;
+    subnet_ip = IP;
+    netmask = mask;
+    DNS_server = dns;
+}
+
+
+void DHCPServer::set_subnet(uint32_t IP, uint32_t mask) {
+    subnet_ip = IP;
+    netmask = mask;
+}
+
+void DHCPServer::set_subnet_ip(uint32_t IP) {
+    subnet_ip = IP;
+}
+
+void DHCPServer::set_subnet_netmask(uint32_t mask) {
+    netmask = mask;
+}
+
+void DHCPServer::set_DNS_server(uint32_t dns){
+    DNS_server = dns;
+}
+
+void DHCPServer::new_DHCP_discover(uint32_t transaction_id, std::vector<uint8_t> src_mac) {
+    // for now, assume that the client is not already represented. I'll figure out how
+    // to deal with the situation that a client requests an address when they already have
+    // one in the DHCP table
+
+
+    // for (std::vector<DHCPEntry>::iterator it = table.begin(); it != table.end(); ++it)
+}
+
+void DHCPServer::send_DHCP_offer() {
+    // generate ip
+    // create packet with transaction id and 
+}
+
+
+
+
+std::vector<uint8_t> DHCPServer::generate_ip();
+void DHCPServer::flush_ips();
+std::vector<uint8_t> subnet_ip;
+int subnet_bits;
+std::vector<uint8_t> DNS_server;
+std::vector<DHCPEntry> table;
+std::vector<uint8_t> netmask;
+std::time_t ip_lifetime;
+
+
+
+
+int main() {
+    return 0;
+}
