@@ -153,15 +153,6 @@ std::string ip_to_string(uint32_t ip_addr){
 
 // int main() {
 
-//     srand(time(NULL));
-//     uint8_t byte = 45;
-//     uint32_t ip1 = create_random_ip();
-//     uint32_t ip2 = create_ip(192,168,0,188);
-//     uint32_t ip3 = create_broadcast_ip();
-
-//     cout << ip_to_string(ip1) << " " << is_broadcast(ip1) << endl;
-//     cout << ip_to_string(ip2) << " " << is_broadcast(ip2) << endl;
-//     cout << ip_to_string(ip3) << " " << is_broadcast(ip3) << endl;
 
 //     return 0;
 // }
