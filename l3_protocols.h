@@ -21,10 +21,9 @@ class ICMP {
 		std::vector<uint8_t> payload;
 };
 
-class ARP_entry {
-	public:
-		uint32_t ip;
-		std::vector<uint8_t> mac;
+struct ARP_entry {
+	uint32_t ip;
+	std::vector<uint8_t> mac;
 };
 
 class ARP_cache {
