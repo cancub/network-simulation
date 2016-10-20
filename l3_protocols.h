@@ -6,19 +6,20 @@
 
 using namespace std;
 
-class ICMP {
-	public:
-		ICMP();
-		ICMP(uint8_t);
-		ICMP(uint8_t,uint8_t);
-		ICMP(const ICMP & obj);
-		void increment_sequence_number();
-	private:
-		uint8_t type;
-		uint8_t code;
-		uint16_t checksum;
-		uint8_t	sequence_number;
-		std::vector<uint8_t> payload;
+struct ICMP {
+	uint8_t type;
+	uint8_t code;
+	uint16_t checksum;
+	uint8_t	sequence_number;
+	std::vector<uint8_t> payload;
+};
+
+struct ARP {
+	uint16_t opcode;
+	vector<uint8_t> sender_mac;
+	uint32_t sender_ip;
+	vector<uint8_t> target_mac;
+	uint32_t target_ip;
 };
 
 struct ARP_entry {
@@ -34,6 +35,8 @@ class ARP_cache {
 	private:
 		std::vector<ARP_entry> cache;
 };
+
+ARP generate_ARP(vector<uint8_t> arp_u8);
 
 
 #endif

@@ -3,27 +3,6 @@
 #include <iostream>
 #include <cstdint>
 
-ICMP::ICMP() {}
-
-ICMP::ICMP(uint8_t packet_type){
-	type = packet_type;
-	sequence_number = 0;
-}
-
-ICMP::ICMP(uint8_t packet_type,uint8_t sn){
-	type = packet_type;
-	sequence_number = sn;
-}
-
-ICMP::ICMP(const ICMP & obj){
-	sequence_number = obj.sequence_number;
-	type = obj.type;
-}
-
-void ICMP::increment_sequence_number() {
-	sequence_number++;
-}
-
 
 std::vector<uint8_t> ARP_cache::get_mac(uint32_t ip) {
 
@@ -49,6 +28,37 @@ void ARP_cache::add_entry(uint32_t ip, std::vector<uint8_t> mac) {
 
 void ARP_cache::clear() {
 	cache.clear();
+}
+
+
+ARP generate_ARP(vector<uint8_t> arp_u8) {
+	ARP arp_result;
+	arp_result.opcode = (((uint16_t)(arp_u8[0]) << 8) & 0xFF00) + 
+							(((uint16_t)(arp_u8[1])) & 0x00FF);
+
+	arp_result.sender_mac.reserve(6);
+	for (int i = 2; i < 8; i++) {
+		arp_result.sender_mac.push_back(arp_u8[i]);
+	}
+
+	arp_result.sender_ip = 0x00000000;
+	for (int i = 8; i < 12; i++) {
+		arp_result.sender_ip |= ((uint32_t)(arp_u8[i]) &0x000000FF ) << (8 * (11-i));
+	}
+
+
+	arp_result.target_mac.reserve(6);
+	for (int i = 12; i < 18; i++) {
+		arp_result.target_mac.push_back(arp_u8[i]);
+	}
+
+	arp_result.target_ip = 0x00000000;
+	for (int i = 18; i < 22; i++) {
+		arp_result.target_ip |= ((uint32_t)(arp_u8[i]) &0x000000FF ) << (8 * (21-i));
+	}
+
+	return arp_result;
+
 }
 
 
