@@ -1,14 +1,14 @@
 #include <mutex>
 #include <iostream>
 #include "data_links.h"
-#include "frames.h"
+#include "pdu.h"
 #include <condition_variable> // std::condition_variable
 #include "wqueue.h"
 
 Ethernet::Ethernet() {
     //initialize a queue as the interface and set the maximum size of the queue to however
     // many frames this interface can hold (in this case 1)
-    interface = new wqueue<Frame*>;
+    interface = new wqueue<MPDU*>;
     interface->set_max_size(1);
 }
 
@@ -17,12 +17,12 @@ Ethernet::~Ethernet() {
 }
 
 
-void Ethernet::transmit(Frame* tx_frame) {
+void Ethernet::transmit(MPDU* tx_frame) {
 	// wait on the interface to be cleared before sending a frame
 	interface->add(tx_frame);
 }
 
-Frame* Ethernet::receive() {
+MPDU* Ethernet::receive() {
 	// wait for a signal to be received and then process the frames
 	return interface->remove();
 }

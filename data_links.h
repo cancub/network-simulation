@@ -3,7 +3,7 @@
 
 #include <mutex>
 #include <vector>
-#include "frames.h"
+#include "pdu.h"
 #include <condition_variable> // std::condition_variable
 #include "wqueue.h"
 
@@ -32,10 +32,10 @@ class Ethernet {
     public:
         Ethernet();
         ~Ethernet();
-        void transmit(Frame*);
-        Frame* receive();
+        void transmit(MPDU*);
+        MPDU* receive();
     private:
-        wqueue<Frame*>* interface;
+        wqueue<MPDU*>* interface;
 };
 
 class Air {};
