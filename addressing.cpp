@@ -121,6 +121,23 @@ int is_broadcast(uint32_t address) {
     return address == 0xFFFFFFFF;
 }
 
+int in_subnet(uint32_t ip_1,uint32_t ip_2, uint32_t test_netmask) {
+    // roll through each of the bits of the netmask
+    for (int i = 0; i < 32; i++){
+        // check to see if this bit is 1 in the netmask, meaning
+        // that an ip in the same subnet should be equal to the subnet
+        // at this bit
+        if ((test_netmask >> i) & 0x01){
+            if (!(((ip_1 >> i) &  0x01) == ((ip_2 >> i) & 0x01))) {
+                // if this is not true, then the address isn't in the same subnet
+                return 0;
+            }
+        }
+    }
+
+    return 1;
+}   
+
 std::string mac_to_string(std::vector<uint8_t> mac_addr){
 
     std::ostringstream convert;
@@ -152,6 +169,13 @@ std::string ip_to_string(uint32_t ip_addr){
 
 
 // int main() {
+
+//     uint32_t ip_1 = create_ip(192,168,0,25);
+//     uint32_t ip_2 = create_ip(192,168,0,105);
+
+//     uint32_t netmask = create_ip(255,255,255,192);
+
+//     std::cout << in_subnet(ip_1, ip_2, netmask) << std::endl;
 
 
 //     return 0;

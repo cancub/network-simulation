@@ -14,6 +14,53 @@
 
 using namespace std;
 
+
+IP::IP(){}
+IP::IP(ICMP){}
+IP::IP(TCP){}
+IP::IP(UDP){}
+void IP::encap_SDU(ICMP new_ICMP) {
+    // set the type since we know it's ARP
+    SDU_type = 0x0806;
+
+    SDU_length = 22;
+    SDU.clear();
+    SDU.reserve(SDU_length);
+
+    int j = 0;
+
+    SDU.push_back(new_ICMP.type);
+    SDU.push_back(new_ICMP.code);
+
+    for (int i = 2; i >= 0; i--) {
+        SDU.push_back((new_ICMP.checksum >> (i*8)) & 0xFF);
+    }
+
+    SDU.push_back(new_ICMP.sequence_number);
+
+    for (int i = 0; i < new_ICMP.payload_length; i++) {
+        SDU.push_back(new_ICMP.payload[i]);
+    }
+
+}
+void IP::encap_SDU(TCP) {}
+void IP::encap_SDU(UDP) {}
+IP::~IP() {}
+
+void IP::set_src_ip(uint32_t src_ip) {source_ip = src_ip;}
+void IP::set_dest_ip(uint32_t dest_ip) {destination_ip = dest_ip;}
+uint8_t IP::get_header_length() {return header_length;}
+uint16_t IP::get_total_length() {return header_length + SDU_length;}
+uint32_t IP::get_source_ip() {return source_ip;}
+uint32_t IP::get_destination_ip() {return destination_ip;}
+uint8_t IP::get_protocol() {return protocol;}
+uint16_t IP::get_SDU_length() {return SDU_length;}
+std::vector<uint8_t> IP::get_SDU() {return SDU;}
+
+
+
+
+
 MPDU::MPDU() {
     source_mac.reserve(6);
     destination_mac.reserve(6);
@@ -31,7 +78,7 @@ std::vector<uint8_t> MPDU::get_src_mac() { return source_mac; }
 
 std::vector<uint8_t> MPDU::get_dst_mac() { return destination_mac; }
         
-size_t MPDU::get_size() {return 12 + SDU_size;}
+size_t MPDU::get_size() {return 12 + SDU_length;}
 
 void MPDU::set_src_mac(std::vector<uint8_t> mac) {
     source_mac = mac;
@@ -41,7 +88,7 @@ void MPDU::set_dst_mac(std::vector<uint8_t> mac) {
     destination_mac = mac;
 }
 
-void MPDU::encap_SDU(IP new_SDU) {
+void MPDU::encap_SDU(IP new_IP) {
     uint8_t * temp_ip;
 
     // set the type since we know it's IP
@@ -51,28 +98,35 @@ void MPDU::encap_SDU(IP new_SDU) {
     // take up, so we can copy the contents, byte by byte into the SDU (since the 
     // data link layer should be agnostic to the L2 frame payload contents)
 
-    SDU.reserve(new_SDU.total_length);
+    SDU.reserve(new_IP.get_total_length());
 
-    for (int i = 0; i < 2; i++) {
-        SDU.push_back(((uint8_t*)(new_SDU.total_length))[i]);
+    // header length 1 byte
+    SDU.push_back(new_IP.get_header_length());
+
+    // total length 2 bytes
+    for (int i = 2; i >= 0; i--) {
+        SDU.push_back((new_IP.get_total_length() >> (i*8)) & 0xFF);
     }
 
-    temp_ip = (uint8_t*)(new_SDU.source_ip);
+    // protocol 1 byte
+    SDU.push_back(new_IP.get_protocol());
 
-    for (int i = 0; i < 4; i++) {
-        SDU.push_back(temp_ip[i]);
+    // source ip 4 bytes
+    for (int i = 3; i >= 0; i--) {
+        SDU.push_back((new_IP.get_source_ip() >> (i*8)) & 0xFF);
     }
 
-    temp_ip = (uint8_t*)(new_SDU.destination_ip);
-
-    for (int i = 0; i < 4; i++) {
-        SDU.push_back(temp_ip[i]);
+    // dest ip 4 bytes
+    for (int i = 3; i >= 0; i--) {
+        SDU.push_back((new_IP.get_destination_ip() >> (i*8)) & 0xFF);
     }
 
-    SDU.push_back(new_SDU.protocol);
+    // SDU
 
-    for (int i = 0; i < SDU_size-11; i++) {
-        SDU.push_back(new_SDU.SDU[i]);
+    std::vector<uint8_t> SDU_to_add = new_IP.get_SDU();
+
+    for (int i = 0; i < new_IP.get_SDU_length(); i++) {
+        SDU.push_back(SDU_to_add[i]);
     }
 }
 
@@ -80,9 +134,9 @@ void MPDU::encap_SDU(ARP new_ARP) {
     // set the type since we know it's ARP
     SDU_type = 0x0806;
 
-    SDU_size = 22;
+    SDU_length = 22;
     SDU.clear();
-    SDU.reserve(SDU_size);
+    SDU.reserve(SDU_length);
 
     int j = 0;
 
@@ -90,64 +144,21 @@ void MPDU::encap_SDU(ARP new_ARP) {
         SDU.push_back((new_ARP.opcode >> (i*8)) & 0xFF);
     }
 
-    // for (std::vector<uint8_t>::iterator it = SDU.begin(); it != SDU.end(); ++it) {
-    //     if (*it < 16) {
-    //         cout << "0";
-    //     }
-    //     cout << std::hex << (int)(*it) << " "; 
-    // }
-
-    // cout << endl;
-
     for (int i = 0; i < 6; i++) {
         SDU.push_back(new_ARP.sender_mac[i]);
     }
-
-    // for (std::vector<uint8_t>::iterator it = SDU.begin(); it != SDU.end(); ++it) {
-    //     if (*it < 16) {
-    //         cout << "0";
-    //     }
-    //     cout << std::hex << (int)(*it) << " "; 
-    // }
-
-    // cout << endl;
 
     for (int i = 3; i >= 0; i--) {
         SDU.push_back((new_ARP.sender_ip >> (i*8)) & 0xFF);
     }
 
-    // for (std::vector<uint8_t>::iterator it = SDU.begin(); it != SDU.end(); ++it) {
-    //     if (*it < 16) {
-    //         cout << "0";
-    //     }
-    //     cout << std::hex << (int)(*it) << " "; 
-    // }
-
-    // cout << endl;
-
     for (int i = 0; i < 6; i++) {
         SDU.push_back(new_ARP.target_mac[i]);
     }
 
-    // for (std::vector<uint8_t>::iterator it = SDU.begin(); it != SDU.end(); ++it) {
-    //     if (*it < 16) {
-    //         cout << "0";
-    //     }
-    //     cout << std::hex << (int)(*it) << " "; 
-    // }
-    // cout << endl;
-
     for (int i = 3; i >= 0; i--) {
         SDU.push_back((new_ARP.target_ip >> (i*8)) & 0xFF);
     }
-
-    // for (std::vector<uint8_t>::iterator it = SDU.begin(); it != SDU.end(); ++it) {
-    //     if (*it < 16) {
-    //         cout << "0";
-    //     }
-    //     cout << std::hex << (int)(*it) << " "; 
-    // }
-    // cout << endl;
 }
 
 uint16_t MPDU::get_SDU_type() {return SDU_type;}

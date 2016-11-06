@@ -156,6 +156,9 @@ void Switch::unicast(MPDU* tx_frame, int if_id) {
 
 void Switch::broadcast(MPDU* tx_frame) {
     // send frames on all interfaces except the in interface, in_if
+#ifdef DEBUG
+    switch_print("broadcasting");
+#endif
     for (int i = 0; i < tx_interfaces.size(); i++) {
         // check if interface number, i, is in one of the TableEntry 
         // objects. if it is and the interface isn't the same as the in_interface
@@ -201,12 +204,11 @@ int Switch::get_table_interface_number(std::vector<uint8_t> mac_addr) {
     // have to be updated in the code when we move to a true network format
     int result = -1;
 
-    if (switch_table.size() != 0) {
+    if (switch_table.size() != 0 && !is_broadcast(mac_addr)) {
         for (int i = 0; i < switch_table.size(); i++) {
-
             for (std::vector<std::vector<uint8_t>>::iterator it = switch_table.at(i)->address_list.begin();
-                it != switch_table.at(i)->address_list.end(); ++it){                
-                if (compare_macs(mac_addr,*it) == 0) {
+                it != switch_table.at(i)->address_list.end(); ++it){ 
+                if (compare_macs(mac_addr,*it)) {
                     return (switch_table.at(i))->interface_number;
                 }
             }
@@ -235,7 +237,7 @@ void Switch::add_table_entry(std::vector<uint8_t> source_mac, int if_id) {
     new_entry->address_list.push_back(source_mac);
     switch_table.push_back(new_entry);
 #ifdef DEBUG
-    switch_print("Table entry added for " + source_mac);
+    switch_print("Table entry added for " + mac_to_string(source_mac));
     print_routing_table();
 #endif
 }
@@ -268,7 +270,7 @@ void Switch::switch_print(std::string statement) {
 
 
 Router::Router() {
-    main_dhcp = new DHCPServer(frame_queue, create_ip(192,168,0,0), 24, create_ip(192.168.0.4));
+    main_dhcp = new DHCPServer(frame_queue, create_ip(192,168,0,0), 24, create_ip(192,168,0,4));
 }      
 
 Router::Router(uint32_t subnet_ip, uint32_t netmask, uint32_t DNS_ip){
@@ -351,18 +353,12 @@ void DHCPServer::send_DHCP_offer() {
 
 
 
-std::vector<uint8_t> DHCPServer::generate_ip();
-void DHCPServer::flush_ips();
-std::vector<uint8_t> subnet_ip;
-int subnet_bits;
-std::vector<uint8_t> DNS_server;
-std::vector<DHCPEntry> table;
-std::vector<uint8_t> netmask;
-std::time_t ip_lifetime;
+std::vector<uint8_t> DHCPServer::generate_ip() {};
+void DHCPServer::flush_ips() {};
 
 
 
 
-int main() {
-    return 0;
-}
+// int main() {
+//     return 0;
+// }

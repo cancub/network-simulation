@@ -22,6 +22,8 @@ int compare_ips(uint32_t, uint32_t);
 int is_broadcast(std::vector<uint8_t>);
 int is_broadcast(uint32_t);
 
+int in_subnet(uint32_t,uint32_t, uint32_t);
+
 std::string mac_to_string(std::vector<uint8_t>);
 std::string ip_to_string(uint32_t);
 

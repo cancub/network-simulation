@@ -18,6 +18,35 @@ class TableEntry {
         int interface_number;
 };
 
+class DHCPEntry {
+    std::vector<uint8_t> mac;
+    uint32_t ip;
+    std::vector<uint8_t> first_hop_router;
+    std::time_t creation_time;
+};
+
+class DHCPServer {
+    public:
+        DHCPServer(wqueue<MPDU*>*);
+        DHCPServer(wqueue<MPDU*>*, uint32_t, uint32_t);
+        DHCPServer(wqueue<MPDU*>*, uint32_t, uint32_t, uint32_t);
+        void set_subnet(uint32_t, uint32_t);
+        void set_subnet_ip(uint32_t);
+        void set_subnet_netmask(uint32_t);
+        void set_DNS_server(uint32_t);
+        void new_DHCP_discover(uint32_t, std::vector<uint8_t>);
+    private:
+        void send_DHCP_offer();
+        std::vector<uint8_t> generate_ip();
+        void flush_ips();
+        uint32_t subnet_ip;
+        uint32_t netmask;
+        uint32_t DNS_server;
+        std::vector<DHCPEntry> table;
+        std::time_t ip_lifetime;
+        wqueue<MPDU*>* tx_queue;
+};
+
 class Switch {
     public:
         Switch();
@@ -50,43 +79,16 @@ class Switch {
 class Router {
     public:
         Router(); 
-        Router(std::vector<uint8_t>, int, std::vector<uint8_t>);       
+        Router(uint32_t, uint32_t, uint32_t);      
     private:
         std::string formulate_ACK();
         void receiver();
         void sender();
-        DHCPServer* main_dchp;
+        DHCPServer* main_dhcp;
         wqueue<MPDU*>* frame_queue;
 };
 
-class DHCPEntry {
-    std::vector<uint8_t> mac,
-    std::vector<uint8_t> ip;
-    std::vector<uint8_t> first_hop_router;
-    std::time_t creation_time;
-};
 
-class DHCPServer {
-    public:
-        DHCPServer(wqueue<MPDU*>*);
-        DHCPServer(wqueue<MPDU*>*, uint32_t, uint32_t);
-        DHCPServer(wqueue<MPDU*>*, uint32_t, uint32_t, uint32_t);
-        void set_subnet(uint32_t, uint32_t);
-        void set_subnet_ip(uint32_t);
-        void set_subnet_netmask(uint32_t);
-        void set_DNS_server(uint32_t);
-        void new_DHCP_discover(uint32_t, std::vector<uint8_t>);
-    private:
-        void send_DHCP_offer();
-        std::vector<uint8_t> generate_ip();
-        void flush_ips();
-        uint32_t subnet_ip;
-        uint32_t netmask;
-        uint32_t DNS_server;
-        std::vector<DHCPEntry> table;
-        std::time_t ip_lifetime;
-        wqueue<MPDU*>* tx_queue;
-};
 
 // class Hub {
 

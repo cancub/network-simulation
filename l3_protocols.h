@@ -6,12 +6,15 @@
 
 using namespace std;
 
+#define ICMP_REQUEST 0x08
+
 struct ICMP {
 	uint8_t type;
 	uint8_t code;
 	uint16_t checksum;
 	uint8_t	sequence_number;
 	std::vector<uint8_t> payload;
+	uint16_t payload_length;
 };
 
 struct ARP {
@@ -35,6 +38,8 @@ class ARP_cache {
 	private:
 		std::vector<ARP_entry> cache;
 };
+
+void fill_ICMP_payload(ICMP);
 
 ARP generate_ARP(vector<uint8_t> arp_u8);
 

@@ -23,21 +23,44 @@ class TCP {
         void erase();   // reset the MPDU to be blank
         TCP* copy();
     private:
-        size_t SDU_size;
+        size_t SDU_length;
         std::vector<uint8_t> SDU;
 };
 
 struct UDP {
-    size_t SDU_size;
+    size_t SDU_length;
     std::vector<uint8_t> SDU;
 };
 
-struct IP {      
-    uint16_t total_length;
-    uint32_t source_ip;
-    uint32_t destination_ip;
-    uint8_t protocol;
-    std::vector<uint8_t> SDU;
+class IP { 
+    public:
+        IP();
+        IP(ICMP);
+        IP(TCP);
+        IP(UDP);
+        void encap_SDU(ICMP);
+        void encap_SDU(TCP);
+        void encap_SDU(UDP);
+        void set_src_ip(uint32_t);
+        void set_dest_ip(uint32_t);
+        uint32_t get_source_ip();
+        uint32_t get_destination_ip();
+        uint8_t get_protocol();
+        uint16_t get_SDU_length();
+        uint8_t get_header_length();
+        uint16_t get_total_length();
+        std::vector<uint8_t> get_SDU();
+        ~IP();
+    private:     
+        uint8_t header_length;
+        uint16_t total_length;
+        uint32_t source_ip;
+        uint32_t destination_ip;
+        uint8_t protocol;
+        uint16_t SDU_type;
+        uint16_t SDU_length;
+
+        std::vector<uint8_t> SDU;
 };
 
 
@@ -59,7 +82,7 @@ class MPDU {
     private:
         std::vector<uint8_t> source_mac;
         std::vector<uint8_t> destination_mac;
-        size_t SDU_size;
+        size_t SDU_length;
         uint16_t SDU_type;
         std::vector<uint8_t> SDU;
 };
