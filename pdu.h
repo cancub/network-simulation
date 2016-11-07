@@ -41,8 +41,8 @@ class IP {
         void encap_SDU(ICMP);
         void encap_SDU(TCP);
         void encap_SDU(UDP);
-        void set_src_ip(uint32_t);
-        void set_dest_ip(uint32_t);
+        void set_source_ip(uint32_t);
+        void set_destination_ip(uint32_t);
         uint32_t get_source_ip();
         uint32_t get_destination_ip();
         uint8_t get_protocol();
@@ -54,11 +54,9 @@ class IP {
     private:     
         uint8_t header_length;
         uint16_t total_length;
+        uint8_t protocol;
         uint32_t source_ip;
         uint32_t destination_ip;
-        uint8_t protocol;
-        uint16_t SDU_type;
-        uint16_t SDU_length;
 
         std::vector<uint8_t> SDU;
 };
@@ -68,11 +66,11 @@ class MPDU {
     public:
         MPDU(); // default constructor
         ~MPDU();
-        std::vector<uint8_t> get_src_mac();
+        std::vector<uint8_t> get_source_mac();
         std::vector<uint8_t> get_dst_mac();
         MPDU* copy();
         size_t get_size();
-        void set_src_mac(std::vector<uint8_t>);
+        void set_source_mac(std::vector<uint8_t>);
         void set_dst_mac(std::vector<uint8_t>);
         void encap_SDU(IP);        
         void encap_SDU(ARP);

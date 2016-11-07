@@ -15,46 +15,53 @@
 using namespace std;
 
 
-IP::IP(){}
+IP::IP(){
+    header_length = 12; // header_length + total_length + protocol + source and dest IPs
+}
 IP::IP(ICMP){}
 IP::IP(TCP){}
 IP::IP(UDP){}
 void IP::encap_SDU(ICMP new_ICMP) {
     // set the type since we know it's ARP
-    SDU_type = 0x0806;
 
-    SDU_length = 22;
+    protocol = 1; // ICMP
+
+    // cout << "header length set to " << std::to_string(header_length) << endl;
+
     SDU.clear();
-    SDU.reserve(SDU_length);
+    SDU.reserve(6 + new_ICMP.payload.size());
 
     int j = 0;
 
     SDU.push_back(new_ICMP.type);
     SDU.push_back(new_ICMP.code);
 
-    for (int i = 2; i >= 0; i--) {
+    for (int i = 1; i >= 0; i--) {
         SDU.push_back((new_ICMP.checksum >> (i*8)) & 0xFF);
     }
 
-    SDU.push_back(new_ICMP.sequence_number);
+    for (int i = 1; i >= 0; i--) {
+        SDU.push_back((new_ICMP.sequence_number >> (i*8)) & 0xFF);
+    }
 
-    for (int i = 0; i < new_ICMP.payload_length; i++) {
+    for (int i = 0; i < new_ICMP.payload.size(); i++) {
         SDU.push_back(new_ICMP.payload[i]);
     }
 
+    total_length = header_length + SDU.size();
 }
 void IP::encap_SDU(TCP) {}
 void IP::encap_SDU(UDP) {}
 IP::~IP() {}
 
-void IP::set_src_ip(uint32_t src_ip) {source_ip = src_ip;}
-void IP::set_dest_ip(uint32_t dest_ip) {destination_ip = dest_ip;}
+void IP::set_source_ip(uint32_t source_ip) {source_ip = source_ip;}
+void IP::set_destination_ip(uint32_t destination_ip) {destination_ip = destination_ip;}
 uint8_t IP::get_header_length() {return header_length;}
-uint16_t IP::get_total_length() {return header_length + SDU_length;}
+uint16_t IP::get_total_length() {return total_length;}
 uint32_t IP::get_source_ip() {return source_ip;}
 uint32_t IP::get_destination_ip() {return destination_ip;}
 uint8_t IP::get_protocol() {return protocol;}
-uint16_t IP::get_SDU_length() {return SDU_length;}
+uint16_t IP::get_SDU_length() {return SDU.size();}
 std::vector<uint8_t> IP::get_SDU() {return SDU;}
 
 
@@ -74,13 +81,13 @@ MPDU* MPDU::copy() {
     return new MPDU(*this);
 }
 
-std::vector<uint8_t> MPDU::get_src_mac() { return source_mac; }
+std::vector<uint8_t> MPDU::get_source_mac() { return source_mac; }
 
 std::vector<uint8_t> MPDU::get_dst_mac() { return destination_mac; }
         
 size_t MPDU::get_size() {return 12 + SDU_length;}
 
-void MPDU::set_src_mac(std::vector<uint8_t> mac) {
+void MPDU::set_source_mac(std::vector<uint8_t> mac) {
     source_mac = mac;
 }
 
@@ -213,7 +220,7 @@ void print_bytes(void* to_print, int number_of_bytes) {
 //     // encap it
 
 //     MPDU my_mpdu;
-//     my_mpdu.set_src_mac(my_arp.sender_mac);
+//     my_mpdu.set_source_mac(my_arp.sender_mac);
 //     my_mpdu.set_dst_mac(create_broadcast_mac());
 //     my_mpdu.encap_SDU(my_arp);
 
@@ -234,5 +241,52 @@ void print_bytes(void* to_print, int number_of_bytes) {
 //     my_SDU = my_mpdu.get_SDU();
 
 //     print_bytes((void*)(&(my_SDU[0])), 22);
+
+// }
+
+// int main() {
+
+//     // create an icmp
+//     ICMP my_icmp;
+//     my_icmp.type = 0;
+//     my_icmp.code = 1;
+//     my_icmp.checksum = 0xeeb7;
+//     my_icmp.sequence_number = 20;
+//     my_icmp.payload.reserve(10);
+//     for (int i = 0; i < 10; i++){
+//         my_icmp.payload.push_back(i);
+//     }
+
+//     cout << to_string(my_icmp.type) << endl;
+//     cout << to_string(my_icmp.code) << endl;
+//     cout << my_icmp.checksum << endl;
+//     cout << my_icmp.sequence_number << endl;
+//     for(int i = 0; i < my_icmp.payload.size(); i++) {
+//         cout << to_string(my_icmp.payload[i]) << " ";
+//     }
+//     cout << endl;
+
+
+//     // encap it in IP
+//     IP my_ip;
+//     my_ip.set_source_ip(create_random_ip());
+//     my_ip.set_destination_ip(create_random_ip());
+//     my_ip.encap_SDU(my_icmp);
+
+
+
+//     // obtain the SDU and get a new ICMP from it
+//     std::vector<uint8_t> my_SDU = my_ip.get_SDU();
+//     ICMP second_icmp = generate_ICMP(my_SDU);
+
+//     // print out the results
+//     cout << to_string(second_icmp.type) << endl;
+//     cout << to_string(second_icmp.code) << endl;
+//     cout << second_icmp.checksum << endl;
+//     cout << second_icmp.sequence_number << endl;
+//     for(int i = 0; i < second_icmp.payload.size(); i++) {
+//         cout << to_string(second_icmp.payload[i]) << " ";
+//     }
+//     cout << endl;
 
 // }
