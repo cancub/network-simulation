@@ -127,9 +127,12 @@ void arp_test() {
     // create a switch
     Switch* test_switch = new Switch("Switch1");
 
+    cout << "creating MACs" << endl;
     std::vector<uint8_t> alice_mac = create_uniform_mac(0x11);
     std::vector<uint8_t> bob_mac = create_uniform_mac(0x22);
+    // cout << "macs are " << mac_to_string(alice_mac) << " and " << mac_to_string(bob_mac) << endl;
 
+    cout << "creating IPs" << endl;
     uint32_t alice_ip = create_ip(111,111,111,111);
     uint32_t bob_ip = create_ip(222,222,222,222);
 

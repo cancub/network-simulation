@@ -7,7 +7,11 @@
 
 using namespace std;
 
-#define ICMP_REQUEST 0x08
+#define ICMP_ECHO_REQUEST 	0x08
+#define ICMP_ECHO_REPLY   	0x00
+
+#define ARP_REQUEST			0x0001
+#define ARP_REPLY			0x0002
 
 struct ICMP {
 	uint8_t type;

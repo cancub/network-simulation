@@ -39,13 +39,18 @@ class Host{
         void send_MPDU(MPDU*); // sending a frame to a specific MAC address
         void process_frame(MPDU*, std::vector<uint8_t>); // process an incoming frames
         void increment_frame_count();
-        void ping(uint32_t, int);
+        void fill_ping_payload();
+        void run_ping_process(uint32_t, int);
+        void receive_ping(std::vector<uint8_t>, uint32_t, std::vector<uint8_t>);
         void arping(uint32_t, int, int);
-        void send_arp(uint32_t, int);
+        void send_request_arp(uint32_t, int);
         void send_arp(ARP, std::vector<uint8_t>, int);
         void receive_arp(std::vector<uint8_t>);
         int run_DHCP_handshake();
         void host_print(std::string);
+        ICMP ping_to_send;
+        uint8_t ping_running;
+        std::chrono::time_point<std::chrono::high_resolution_clock> ping_send_time;
         Poisson* frame_generator; // the object that will create all the interarrival times
         Ethernet* rx_interface; // the location where the frames will be found/put on
         Ethernet* tx_interface; // the location where the frames will be found/put on

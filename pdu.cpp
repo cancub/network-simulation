@@ -21,6 +21,34 @@ IP::IP(){
 IP::IP(ICMP){}
 IP::IP(TCP){}
 IP::IP(UDP){}
+
+// take a u8 version of the IP frame and create an IP object from it
+IP::IP(std::vector<uint8_t> ip_u8) {
+
+    int i = 0;
+    // uint8_t header_length;
+    header_length = ip_u8[0];
+
+    // uint16_t total_length;
+    total_length = ((uint16_t)(ip_u8[1]) << 8) + ip_u8[2];
+
+    // uint8_t protocol;
+    protocol = ip_u8[3];
+
+    // uint32_t source_ip;
+    source_ip = create_ip(ip_u8[4],ip_u8[5],ip_u8[6],ip_u8[7]);
+
+    // uint32_t destination_ip;
+    destination_ip = create_ip(ip_u8[8],ip_u8[9],ip_u8[10],ip_u8[11]);
+
+    // std::vector<uint8_t> SDU;
+    SDU.reserve(total_length - header_length);
+    for (int i = 0; i < total_length - header_length; i++) {
+        SDU.push_back(ip_u8[i+12]);
+    }
+}
+
+
 void IP::encap_SDU(ICMP new_ICMP) {
     // set the type since we know it's ARP
 
@@ -49,13 +77,14 @@ void IP::encap_SDU(ICMP new_ICMP) {
     }
 
     total_length = header_length + SDU.size();
+
 }
 void IP::encap_SDU(TCP) {}
 void IP::encap_SDU(UDP) {}
 IP::~IP() {}
 
-void IP::set_source_ip(uint32_t source_ip) {source_ip = source_ip;}
-void IP::set_destination_ip(uint32_t destination_ip) {destination_ip = destination_ip;}
+void IP::set_source_ip(uint32_t input_source_ip) {source_ip = input_source_ip;}
+void IP::set_destination_ip(uint32_t input_destination_ip) {destination_ip = input_destination_ip;}
 uint8_t IP::get_header_length() {return header_length;}
 uint16_t IP::get_total_length() {return total_length;}
 uint32_t IP::get_source_ip() {return source_ip;}
@@ -63,10 +92,6 @@ uint32_t IP::get_destination_ip() {return destination_ip;}
 uint8_t IP::get_protocol() {return protocol;}
 uint16_t IP::get_SDU_length() {return SDU.size();}
 std::vector<uint8_t> IP::get_SDU() {return SDU;}
-
-
-
-
 
 MPDU::MPDU() {
     source_mac.reserve(6);
@@ -83,7 +108,7 @@ MPDU* MPDU::copy() {
 
 std::vector<uint8_t> MPDU::get_source_mac() { return source_mac; }
 
-std::vector<uint8_t> MPDU::get_dst_mac() { return destination_mac; }
+std::vector<uint8_t> MPDU::get_destination_mac() { return destination_mac; }
         
 size_t MPDU::get_size() {return 12 + SDU_length;}
 
@@ -91,7 +116,7 @@ void MPDU::set_source_mac(std::vector<uint8_t> mac) {
     source_mac = mac;
 }
 
-void MPDU::set_dst_mac(std::vector<uint8_t> mac) {
+void MPDU::set_destination_mac(std::vector<uint8_t> mac) {
     destination_mac = mac;
 }
 
@@ -100,6 +125,8 @@ void MPDU::encap_SDU(IP new_IP) {
 
     // set the type since we know it's IP
     SDU_type = 0x0800;
+
+    SDU_length = new_IP.get_total_length();
 
     // and since we know it's IP, we know what the headers are and how much space they
     // take up, so we can copy the contents, byte by byte into the SDU (since the 
@@ -111,7 +138,7 @@ void MPDU::encap_SDU(IP new_IP) {
     SDU.push_back(new_IP.get_header_length());
 
     // total length 2 bytes
-    for (int i = 2; i >= 0; i--) {
+    for (int i = 1; i >= 0; i--) {
         SDU.push_back((new_IP.get_total_length() >> (i*8)) & 0xFF);
     }
 
@@ -182,8 +209,6 @@ void MPDU::erase() {
 
 }
 
-
-
 void print_bytes(void* to_print, int number_of_bytes) {
     uint8_t* printer = (uint8_t*)to_print;
     for (int i = 0; i < number_of_bytes; i++) {
@@ -221,7 +246,7 @@ void print_bytes(void* to_print, int number_of_bytes) {
 
 //     MPDU my_mpdu;
 //     my_mpdu.set_source_mac(my_arp.sender_mac);
-//     my_mpdu.set_dst_mac(create_broadcast_mac());
+//     my_mpdu.set_destination_mac(create_broadcast_mac());
 //     my_mpdu.encap_SDU(my_arp);
 
 
@@ -269,14 +294,29 @@ void print_bytes(void* to_print, int number_of_bytes) {
 
 //     // encap it in IP
 //     IP my_ip;
-//     my_ip.set_source_ip(create_random_ip());
-//     my_ip.set_destination_ip(create_random_ip());
+//     uint32_t source_ip = create_random_ip();
+//     my_ip.set_source_ip(source_ip);
+//     cout << ip_to_string(my_ip.get_source_ip()) << endl;
+
+//     uint32_t destination_ip = create_random_ip();
+//     my_ip.set_destination_ip(destination_ip);
+//     cout << ip_to_string(my_ip.get_destination_ip()) << endl;
 //     my_ip.encap_SDU(my_icmp);
 
+//     MPDU my_mpdu;
+//     my_mpdu.set_source_mac(create_random_mac());
+//     my_mpdu.set_destination_mac(create_broadcast_mac());
+//     my_mpdu.encap_SDU(my_ip); 
+
+
+//     IP second_ip(my_mpdu.get_SDU());
+
+//     cout << ip_to_string(second_ip.get_source_ip()) << endl;
+//     cout << ip_to_string(second_ip.get_destination_ip()) << endl;
 
 
 //     // obtain the SDU and get a new ICMP from it
-//     std::vector<uint8_t> my_SDU = my_ip.get_SDU();
+//     std::vector<uint8_t> my_SDU = second_ip.get_SDU();
 //     ICMP second_icmp = generate_ICMP(my_SDU);
 
 //     // print out the results

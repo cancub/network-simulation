@@ -129,14 +129,14 @@ void Switch::sender() {
         // get the next frame
         tx_frame = frame_queue->remove();
         // find if this frame is for a device that has been registered in the table
-        if_id = get_table_interface_number(tx_frame->get_dst_mac());
+        if_id = get_table_interface_number(tx_frame->get_destination_mac());
         if (if_id != -1) {
             // send to the one interface associated with the device
             unicast(tx_frame, if_id);
         } else {
             // send to all interfaces
 #ifdef DEBUG
-            switch_print("Cannot find host MAC in routing table: " + mac_to_string(tx_frame->get_dst_mac()));
+            switch_print("Cannot find host MAC in routing table: " + mac_to_string(tx_frame->get_destination_mac()));
 #endif
             broadcast(tx_frame);
         }  

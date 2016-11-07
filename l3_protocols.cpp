@@ -3,6 +3,8 @@
 #include <iostream>
 #include <cstdint>
 
+// #define DEBUG
+
 
 std::vector<uint8_t> ARP_cache::get_mac(uint32_t ip) {
 
@@ -24,6 +26,14 @@ void ARP_cache::add_entry(uint32_t ip, std::vector<uint8_t> mac) {
 	new_entry.ip = ip;
 	new_entry.mac = mac;
 	cache.push_back(new_entry);
+
+#ifdef DEBUG
+	for (int i = 0; i < cache.size(); i++) {
+		std::cout << "IP: " << ip_to_string(cache[i].ip) << " <-> MAC: " << 
+			mac_to_string(cache[i].mac)<< std::endl; 
+	}
+#endif
+
 }
 
 void ARP_cache::clear() {
