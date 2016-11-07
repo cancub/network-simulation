@@ -165,7 +165,7 @@ void Switch::broadcast(MPDU* tx_frame) {
         // send on that interface. if it isn't in the table, send on that interface as well.
         // this follows from the fact that a table entry for this frame's sender interface
         // must have ben added and thus we send to all other interfaces that have been added.
-        if (get_table_interface_number(tx_frame->get_src_mac()) != i) {
+        if (get_table_interface_number(tx_frame->get_source_mac()) != i) {
             unicast(tx_frame->copy(), i);
         }
     }
@@ -187,11 +187,11 @@ void Switch::receiver(int if_id) {
 void Switch::process_frame(MPDU* rx_frame, int in_if) {
     // add the frame to the queue of frames to be transmitted
     // check to see if the sending device is listed and add the device to the i/f table if its not there
-    int if_id = get_table_interface_number(rx_frame->get_src_mac());
+    int if_id = get_table_interface_number(rx_frame->get_source_mac());
 
     if (if_id == -1) {
         // add interface to table if it does not yet exist there
-        add_table_entry(rx_frame->get_src_mac(), in_if);
+        add_table_entry(rx_frame->get_source_mac(), in_if);
     }
 
     frame_queue->add(rx_frame);
@@ -336,7 +336,7 @@ void DHCPServer::set_DNS_server(uint32_t dns){
     DNS_server = dns;
 }
 
-void DHCPServer::new_DHCP_discover(uint32_t transaction_id, std::vector<uint8_t> src_mac) {
+void DHCPServer::new_DHCP_discover(uint32_t transaction_id, std::vector<uint8_t> source_mac) {
     // for now, assume that the client is not already represented. I'll figure out how
     // to deal with the situation that a client requests an address when they already have
     // one in the DHCP table
