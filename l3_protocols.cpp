@@ -61,6 +61,38 @@ ARP generate_ARP(vector<uint8_t> arp_u8) {
 
 }
 
+ICMP generate_ICMP(vector<uint8_t> icmp_u8) {
+	// for (int i = 0; i < icmp_u8.size(); i++){
+	// 	cout << to_string(icmp_u8[i]) << " ";
+	// }
+	// cout << endl;
+
+	ICMP icmp_result;
+	// uint8_t type;
+	icmp_result.type = icmp_u8[0];
+
+	// uint8_t code;
+	icmp_result.code = icmp_u8[1];
+
+	// uint16_t checksum;
+	// cout << to_string(icmp_u8[2]) << endl;
+	// cout << to_string((uint16_t)(icmp_u8[2])) << endl;
+	// cout << to_string((uint16_t)(icmp_u8[2]) << 8) << endl;
+	// cout << to_string((((uint16_t)(icmp_u8[2]) << 8) & 0xFF00)) << endl;;
+	icmp_result.checksum = (((uint16_t)(icmp_u8[2]) << 8) & 0xFF00) + (icmp_u8[3]);
+
+	// uint8_t	sequence_number;
+	icmp_result.sequence_number = (((uint16_t)(icmp_u8[4]) << 8) & 0xFF00) + (icmp_u8[5]);
+
+	// std::vector<uint8_t> payload;
+	icmp_result.payload.reserve(icmp_u8.size() - 6);
+	for (int i = 6; i < icmp_u8.size(); i++) {
+		icmp_result.payload.push_back(icmp_u8[i]);
+	}
+	
+	return icmp_result;
+}
+
 
 // int main() {
 // 	ARP_cache my_cache;
