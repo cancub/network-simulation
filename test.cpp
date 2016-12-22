@@ -12,6 +12,7 @@
 #include <condition_variable> // std::condition_variable
 #include <list>
 #include <cstdint>
+#include <unistd.h>
 
 using namespace std;
 
@@ -152,8 +153,8 @@ void arp_test() {
 
     // test the arp capabilities of each host
     cout << "starting hosts" << endl;
-    std::thread* alice_thread = new std::thread(&Host::run, alice, bob_ip);
-    std::thread* bob_thread = new std::thread(&Host::run, bob, create_broadcast_ip());
+    std::thread* alice_thread = new std::thread(&Host::run, alice, bob_ip,0);
+    std::thread* bob_thread = new std::thread(&Host::run, bob, alice_ip, 250000);
 
 
     switch_thread->join();

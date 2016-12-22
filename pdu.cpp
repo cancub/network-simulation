@@ -14,6 +14,34 @@
 
 using namespace std;
 
+Socket::Socket(uint16_t port_number, uint8_t protocol_number) {
+    rx_queue = new wqueue<MPDU*>;
+    port = port_number;
+    protocol = protocol_number;
+}
+
+Socket::~Socket() {
+    delete rx_queue;
+}
+
+MPDU* Socket::get_frame() {
+    return rx_queue->remove();
+}
+
+void Socket::add_frame(MPDU* frame_to_add) {
+    rx_queue->add(frame_to_add);
+}
+
+uint16_t Socket::get_port() {
+    return port;
+}
+
+uint8_t Socket::get_protocol() {
+    return protocol;
+}
+
+
+
 
 IP::IP(){
     header_length = 12; // header_length + total_length + protocol + source and dest IPs
@@ -52,12 +80,12 @@ IP::IP(std::vector<uint8_t> ip_u8) {
 void IP::encap_SDU(ICMP new_ICMP) {
     // set the type since we know it's ARP
 
-    protocol = 1; // ICMP
+    protocol = IP_PROTOCOL_ICMP; // ICMP
 
     // cout << "header length set to " << std::to_string(header_length) << endl;
 
     SDU.clear();
-    SDU.reserve(6 + new_ICMP.payload.size());
+    SDU.reserve(8 + new_ICMP.payload.size());
 
     int j = 0;
 
@@ -66,6 +94,10 @@ void IP::encap_SDU(ICMP new_ICMP) {
 
     for (int i = 1; i >= 0; i--) {
         SDU.push_back((new_ICMP.checksum >> (i*8)) & 0xFF);
+    }
+
+    for (int i = 1; i >= 0; i--) {
+        SDU.push_back((new_ICMP.identifier >> (i*8)) & 0xFF);
     }
 
     for (int i = 1; i >= 0; i--) {
@@ -92,6 +124,15 @@ uint32_t IP::get_destination_ip() {return destination_ip;}
 uint8_t IP::get_protocol() {return protocol;}
 uint16_t IP::get_SDU_length() {return SDU.size();}
 std::vector<uint8_t> IP::get_SDU() {return SDU;}
+
+IP generate_IP(std::vector<uint8_t> ip_u8) {
+
+    IP to_return(ip_u8);
+
+    return to_return;
+}
+
+
 
 MPDU::MPDU() {
     source_mac.reserve(6);

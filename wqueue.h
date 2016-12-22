@@ -27,7 +27,6 @@
 #include <mutex>
 #include <condition_variable> // std::condition_variable
 #include <list>
-#include "pdu.h"
 
 using namespace std;
 

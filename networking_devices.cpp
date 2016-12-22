@@ -26,7 +26,7 @@ using namespace std;
 
 #define NUMBER_OF_INTERFACES 10      // the assumed number of physical interfaces the switch has 
 
-// #define DEBUG
+#define DEBUG
 
 Switch::Switch() {
     rx_interfaces.reserve(NUMBER_OF_INTERFACES);

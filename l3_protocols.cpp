@@ -2,8 +2,9 @@
 #include "addressing.h"
 #include <iostream>
 #include <cstdint>
+#include <chrono>
 
-// #define DEBUG
+#define DEBUG
 
 
 std::vector<uint8_t> ARP_cache::get_mac(uint32_t ip) {
@@ -91,17 +92,22 @@ ICMP generate_ICMP(vector<uint8_t> icmp_u8) {
 	// cout << to_string((((uint16_t)(icmp_u8[2]) << 8) & 0xFF00)) << endl;;
 	icmp_result.checksum = (((uint16_t)(icmp_u8[2]) << 8) & 0xFF00) + (icmp_u8[3]);
 
-	// uint8_t	sequence_number;
-	icmp_result.sequence_number = (((uint16_t)(icmp_u8[4]) << 8) & 0xFF00) + (icmp_u8[5]);
+	// uint16_t	identifier;
+	icmp_result.identifier = (((uint16_t)(icmp_u8[4]) << 8) & 0xFF00) + (icmp_u8[5]);
+
+	// uint16_t	sequence_number;
+	icmp_result.sequence_number = (((uint16_t)(icmp_u8[6]) << 8) & 0xFF00) + (icmp_u8[7]);
 
 	// std::vector<uint8_t> payload;
-	icmp_result.payload.reserve(icmp_u8.size() - 6);
-	for (int i = 6; i < icmp_u8.size(); i++) {
+	icmp_result.payload.reserve(icmp_u8.size() - 8);
+	for (int i = 8; i < icmp_u8.size(); i++) {
 		icmp_result.payload.push_back(icmp_u8[i]);
 	}
 	
 	return icmp_result;
 }
+
+
 
 
 // int main() {

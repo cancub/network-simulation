@@ -17,7 +17,8 @@ struct ICMP {
 	uint8_t type;
 	uint8_t code;
 	uint16_t checksum;
-	uint16_t	sequence_number;
+	uint16_t identifier;
+	uint16_t sequence_number;
 	std::vector<uint8_t> payload;
 };
 
@@ -43,11 +44,8 @@ class ARP_cache {
 		std::vector<ARP_entry> cache;
 };
 
-void fill_ICMP_payload(ICMP);
-
 ARP generate_ARP(vector<uint8_t> arp_u8);
 
 ICMP generate_ICMP(vector<uint8_t> icmp_u8);
-
 
 #endif

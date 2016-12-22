@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <vector>
 #include "l3_protocols.h"
+#include "wqueue.h"
 
 /*
 This is the class that will be our interface, since what is an interface if not
@@ -14,6 +15,9 @@ just a pointer to a MPDU on a link?
 
 using namespace std;
 
+#define IP_PROTOCOL_ICMP    0x01
+#define IP_PROTOCOL_TCP     0x06
+#define IP_PROTOCOL_UDP    0x11
 
 class TCP {
     public:
@@ -85,6 +89,20 @@ class MPDU {
         size_t SDU_length;
         uint16_t SDU_type;
         std::vector<uint8_t> SDU;
+};
+
+class Socket {
+    public:
+        Socket(uint16_t, uint8_t);
+        ~Socket();
+        MPDU* get_frame();
+        void add_frame(MPDU*);
+        uint16_t get_port();
+        uint8_t get_protocol();
+    private:
+        uint16_t port;
+        uint8_t protocol;
+        wqueue<MPDU*>* rx_queue;
 };
 
 

@@ -22,6 +22,10 @@ host -- link -- switch -- link -- host
 --------------------------------------------------------------------------------
 COMPLETED WORK:
 
+General:
+- ICMP can be encapped in IP, IP and ARP can be encapped in MPDU
+- ICMP can be retrieved from IP, IP and ARP can be retrieved from MPDU
+
 Data link layer:
 - make frame sending process
 - make host which uses frame sending process
@@ -50,24 +54,20 @@ STOPPED AT:
 
 
 - begin to build up network layer
-	- add ports, creating a queue for each port so that a process in the application
+	- add sockets, creating a queue for each socket so that a process in the application
 		layer can send and receive their own queue
-		- the ports list should be a thread-safe vector of port objects that starts off empty
-		- port objects are comprised of:
+		- the sockets list should be a thread-safe vector of port objects that starts off empty
+		- socket objects are comprised of:
 			- port number
 			- process name
 			- thread safe queue that both the process and the main demuxer can reference
 		- each application, as it starts, does the following:
-			- waits on a mutex for the vector
-			- checks to see if its desired port number is taken by scanning the ports in the array
-			- if it isn't taken, it inserts a port object at the sorted position in the array
-			- if it is taken, it find the next highest port it can take and does the above
+			- calls the create_socket function of the host with a desired port number
 		- this way, when a packet arrives, the demuxer can look at the port number and add the underlying
-			PDU to the queue for the process and also scan through the open ports to see if any of these
-			queues have frames to send
+			PDU to the queue for the process
+		- for the sake of simplicity, at this point applications/processes will simply place tx frames into the usual tx queue
 
 	- start off by assuming that hosts already have mac address and IP
-	- add functionality for encaspulation of network layer PDU as MAC layer PSU
 
 	- stations must obtain an IP
 	- set up basic ip frames such as bootp, icmp, arp
@@ -109,4 +109,6 @@ FUTURE WORK:
 - tcp
 - introduce error for force retransmit
 - make wireless link class
+
+- use smart pointers for things like open_ports
 
