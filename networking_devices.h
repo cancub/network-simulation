@@ -50,12 +50,10 @@ class DHCPServer {
 class Switch {
     public:
         Switch();
-        Switch(std::string);
+        Switch(std::string, mutex*);
         Switch(std::vector<Host*>, std::string);
         ~Switch();
-        void plug_in_device(Host*);
-        void plug_in_device(Switch*);
-        void set_port(Ethernet*, Ethernet*);
+        void connect_ethernet(EthernetLink* e_link, bool flip_wires);
         void run();
         void print_routing_table();
     private:
@@ -67,13 +65,14 @@ class Switch {
         int get_table_interface_number(std::vector<uint8_t>);
         void add_table_entry(std::vector<uint8_t>, int);
         void switch_print(std::string);
-        std::vector<Host*> connected_hosts;
-        std::vector<Ethernet*> rx_interfaces;
-        std::vector<Ethernet*> tx_interfaces;
-        std::vector<TableEntry*> switch_table;
-        std::vector<std::thread*> rx_thread_list;
-        wqueue<MPDU*>* frame_queue;
-        std::string name;
+        std::vector<Host*>              connected_hosts;
+        std::vector<EthernetWire*>      rx_interfaces;
+        std::vector<EthernetWire*>      tx_interfaces;
+        std::vector<TableEntry*>        switch_table;
+        std::vector<std::thread*>       rx_thread_list;
+        wqueue<MPDU*>*                  frame_queue;
+        mutex*                          mutex_m;
+        std::string                     name;
 };
 
 class Router {

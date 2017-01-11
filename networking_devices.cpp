@@ -38,13 +38,14 @@ Switch::Switch() {
     switch_print("Online");
 }
 
-Switch::Switch(std::string switch_name) {
+Switch::Switch(std::string switch_name, mutex* sw_mutex) {
     rx_interfaces.reserve(NUMBER_OF_INTERFACES);
     tx_interfaces.reserve(NUMBER_OF_INTERFACES);
     switch_table.reserve(NUMBER_OF_INTERFACES);
     rx_thread_list.reserve(NUMBER_OF_INTERFACES);
     frame_queue = new wqueue<MPDU*>;
     name = switch_name;
+    mutex_m = sw_mutex;
     switch_print("Online");
 }
 
@@ -61,44 +62,21 @@ Switch::Switch(std::vector<Host*> hosts_to_connect, std::string switch_name) {
 Switch::~Switch() {
     for (int i = 0; i < switch_table.size(); i++) {
         delete switch_table.at(i);
-        delete rx_interfaces.at(i);
-        delete tx_interfaces.at(i);
     }
     delete frame_queue;
 }
 
-void Switch::plug_in_device(Host* device_to_connect) {
-    // when notified that a device has been plugged in,
-    // the switch creates a new rx and tx interface that it associates with that
-    // n'th port and provides those interfaces to the device that was
-    // just connected
-
-    tx_interfaces.push_back(new Ethernet);
-    rx_interfaces.push_back(new Ethernet);
-
-    // set the interfaces for the port on the other end (note that their tx and rx
-    // are a mirror of this switch's tx and rx)
-    device_to_connect->set_port(rx_interfaces.back(), tx_interfaces.back());
-}
-
-void Switch::plug_in_device(Switch* device_to_connect) {
-    // when notified that a device has been plugged in,
-    // the switch creates a new rx and tx interface that it associates with that
-    // n'th port and provides those interfaces to the device that was
-    // just connected
-
-    tx_interfaces.push_back(new Ethernet);
-    rx_interfaces.push_back(new Ethernet);
-
-    // set the interfaces for the port on the other end (note that their tx and rx
-    // are a mirror of this switch's tx and rx)
-    device_to_connect->set_port(rx_interfaces.back(), tx_interfaces.back());
-}
-
-void Switch::set_port(Ethernet* tx_if, Ethernet* rx_if) {
-    // a port can be defined by its outgoing and incoming wires for the ethernet link
-    tx_interfaces.push_back(tx_if);
-    rx_interfaces.push_back(rx_if);
+void Switch::connect_ethernet(EthernetLink* e_link, bool flip_wires = false) {
+    // the reason for flipping the wires involved in this link is that if we were to call the same
+    // function on both sides of the link without flipping the wires, both ends would be using
+    // the same link for transmissions and the same link for receptions, meaning nothing would get through
+    if (!flip_wires) {
+        tx_interfaces.push_back(e_link->get_wire_1());
+        rx_interfaces.push_back(e_link->get_wire_2());
+    } else {
+        rx_interfaces.push_back(e_link->get_wire_1());
+        tx_interfaces.push_back(e_link->get_wire_2());
+    }
 }
 
 void Switch::run() {

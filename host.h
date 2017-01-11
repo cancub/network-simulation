@@ -15,24 +15,26 @@
 /*
 This is one of the big players in the network simulation. Without hosts,
 there's no reason for a network. Hosts need to generate frames, access
-links and read frames. That's pretty much it at the beggining. Later on
-we'll add something to react to specific situations or events, like a ping
+links and read frames. 
 */
 
 class Host{
     public:
         Host(); // default constructor
-        Host(uint32_t, std::vector<uint8_t>, std::string); // IP, MAC, and name (like "alice")
+        Host(uint32_t, std::vector<uint8_t>, std::string, mutex*); // IP, MAC, and name (like "alice")
         // Host(std::string, std::string, std::string, std::mutex*, MPDU*); // same as above but with a
                                                                             // mutex and interface
         ~Host();
-        void run(uint32_t, int); // start sending frames to the specified MAC address
+        void arp_test(uint32_t, int);
+        void ping_test(uint32_t, int, int delay = 0);
+        void tcp_test(uint32_t, uint16_t, uint16_t, int); // start sending frames to the specified MAC address
+        void udp_test(uint32_t, uint16_t, uint16_t, int); // start sending frames to the specified MAC address
         uint32_t get_ip();
         std::vector<uint8_t> get_mac();
         int get_frame_count();
         void set_ip(uint32_t);
         void set_mac(std::vector<uint8_t>);
-        void set_port(Ethernet*, Ethernet*);
+        void connect_ethernet(EthernetLink* e_link, bool flip_wires = false);
         void demuxer();
         void receiver();
     private:
@@ -49,21 +51,26 @@ class Host{
         void receive_arp(std::vector<uint8_t>);
         int run_DHCP_handshake();
         void host_print(std::string);
+        void TCP_client(const char *, uint16_t this_port, uint32_t dest_ip, uint16_t dest_port);
+        void TCP_server(const char *filename, uint16_t this_port);
+        void UDP_client(const char*, uint16_t this_port, uint32_t dest_ip, uint16_t dest_port);
+        void UDP_server(const char *filename, uint16_t this_port);
         Socket* create_socket(uint16_t,uint8_t);         // create a socket that can be used for a specific process 
         void delete_socket(uint16_t);
-        std::vector<Socket*> open_ports; // move to smart pointers in the future
-        Poisson* frame_generator; // the object that will create all the interarrival times
-        Ethernet* rx_interface; // the location where the frames will be found/put on
-        Ethernet* tx_interface; // the location where the frames will be found/put on
-        wqueue<MPDU*>* frame_queue;
-        uint32_t ip;
-        uint32_t netmask;
-        std::vector<uint8_t> mac;
-        std::vector<uint8_t> router_mac;
+        std::vector<Socket*>        open_ports; // move to smart pointers in the future
+        mutex*                      m_mutex;
+        Poisson*                    frame_generator; // the object that will create all the interarrival times
+        EthernetWire*               rx_interface; // the location where the frames will be found/put on
+        EthernetWire*               tx_interface; // the location where the frames will be found/put on
+        wqueue<MPDU*>*              frame_queue;
+        uint32_t                    ip;
+        uint32_t                    netmask;
+        std::vector<uint8_t>        mac;
+        std::vector<uint8_t>        router_mac;
         std::chrono::time_point<std::chrono::high_resolution_clock> host_start_time; // keep track of time
-        int rx_frame_count; // keep track of number of frames received
-        std::string name; // the name of the host
-        ARP_cache cache;
+        int                         rx_frame_count; // keep track of number of frames received
+        std::string                 name; // the name of the host
+        ARP_cache                   cache;
 };
 
 #endif

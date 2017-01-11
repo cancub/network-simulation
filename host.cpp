@@ -1,12 +1,13 @@
 #include <stdlib.h>
-#include <iostream>
+#include <iostream> // printing
 #include <vector>
-#include <thread>
+#include <thread> // threading
 #include <cmath>
 #include <algorithm>
 #include <unistd.h>
+#include <cstdio> // HOST_HOST_EOF
 #include <string>
-#include <chrono>
+#include <chrono> // fine grained timing
 #include "host.h"
 #include "frame_generators.h"
 #include "pdu.h"
@@ -15,16 +16,22 @@
 #include "data_links.h"
 #include "addressing.h"
 #include "l3_protocols.h"
+#include "l4_protocols.h"
+#include "md5.h"
+#include "fstream"
 
 using namespace std;
 
-#define POISSON 10 // the default lambda that we'll work with for now
+#define POISSON 10 // the default lambda for poisson random traffic
 #define MTU     1500    // the maximum transmission unit describes how long a frame can be
 #define FRAME_SIZE_MIN 60 
+#define HOST_EOF 0xFF
 
 #define DEFAULT_TIMEOUT 1 
 
 #define DEBUG
+#define L4_DEBUG
+// #define ARP_DEBUG
 // #define TEST_SENDING
 // #define FRAME_TIMES
 
@@ -34,7 +41,7 @@ using namespace std;
 Host::Host() {
     rx_frame_count = 0;
     frame_generator = new Poisson(POISSON);
-    host_start_time = std::chrono::high_resolution_clock::now();
+    host_start_time = chrono::high_resolution_clock::now();
     name = "unnamed";
     frame_queue = new wqueue<MPDU*>;
 #ifdef DEBUG
@@ -42,13 +49,17 @@ Host::Host() {
 #endif
 }
 
-Host::Host(uint32_t ip_addr, std::vector<uint8_t> mac_addr, std::string hostname) {
+Host::Host(uint32_t ip_addr, vector<uint8_t> mac_addr, string hostname, mutex* stop_m) {
+
+    srand (time(NULL));
+
     ip = ip_addr;
     mac = mac_addr;
     rx_frame_count = 0;
     name = hostname;
+    m_mutex = stop_m;
     frame_generator = new Poisson(POISSON);
-    host_start_time = std::chrono::high_resolution_clock::now();
+    host_start_time = chrono::high_resolution_clock::now();
     frame_queue = new wqueue<MPDU*>;
 #ifdef DEBUG
     host_print("Online with MAC " + mac_to_string(mac));
@@ -61,11 +72,29 @@ Host::~Host() {
     delete frame_queue;
 }
 
-void Host::run(uint32_t destination_ip, int delay) {
+void Host::arp_test(uint32_t dest_ip, int number_of_arps) {
+    // make the threads for receiving and demuxing/sending
+    thread receiver_thread(&Host::receiver,this);
+    thread mux_demux_thread(&Host::demuxer,this);
+
+    // send some arps
+    if (!is_broadcast(dest_ip)) {
+#ifdef DEBUG
+        host_print("ARPing");
+#endif
+        arping(dest_ip,number_of_arps,DEFAULT_TIMEOUT);
+    }
+
+    // let them run
+    receiver_thread.join();
+    mux_demux_thread.join();
+}
+
+void Host::ping_test(uint32_t destination_ip, int number_of_pings, int delay) {
 
     // make the threads for receiving and demuxing/sending
-    std::thread receiver_thread(&Host::receiver,this);
-    std::thread mux_demux_thread(&Host::demuxer,this);
+    thread receiver_thread(&Host::receiver,this);
+    thread mux_demux_thread(&Host::demuxer,this);
 
     usleep(delay);
 
@@ -73,9 +102,65 @@ void Host::run(uint32_t destination_ip, int delay) {
     if (!is_broadcast(destination_ip)) {
         // arping(destination_ip,3,DEFAULT_TIMEOUT);
 #ifdef DEBUG
-        host_print("performing action");
+        host_print("Pinging");
 #endif
-        ping(destination_ip,10);
+        ping(destination_ip,number_of_pings);
+
+
+        unique_lock<mutex> lck(*m_mutex);
+    }
+
+    // let them run
+    receiver_thread.join();
+    mux_demux_thread.join();
+}
+
+void Host::tcp_test(uint32_t destination_ip, uint16_t source_port, uint16_t destination_port, int is_client) {
+
+    // make the threads for receiving and demuxing/sending
+    thread receiver_thread(&Host::receiver,this);
+    thread mux_demux_thread(&Host::demuxer,this);
+
+    // send some arps
+    if (is_client) {
+        // arping(destination_ip,3,DEFAULT_TIMEOUT);
+#ifdef L4_DEBUG
+        host_print("starting TCP client");
+#endif
+        
+
+        TCP_client("a.out",source_port,destination_ip,destination_port);
+    } else {
+#ifdef L4_DEBUG
+        host_print("starting TCP server");
+#endif
+        TCP_server("zzz",source_port);
+    }
+
+    // let them run
+    receiver_thread.join();
+    mux_demux_thread.join();
+}
+
+void Host::udp_test(uint32_t destination_ip, uint16_t source_port, uint16_t destination_port, int is_client) {
+
+    // make the threads for receiving and demuxing/sending
+    thread receiver_thread(&Host::receiver,this);
+    thread mux_demux_thread(&Host::demuxer,this);
+
+    // send some arps
+    if (is_client) {
+        // arping(destination_ip,3,DEFAULT_TIMEOUT);
+#ifdef L4_DEBUG
+        host_print("starting UDP client");
+#endif
+
+        UDP_client("networking_devices.cpp",source_port,destination_ip,destination_port);
+    } else {
+#ifdef L4_DEBUG
+        host_print("starting UDP server");
+#endif
+        UDP_server("zzz",source_port);
     }
 
     // let them run
@@ -85,7 +170,7 @@ void Host::run(uint32_t destination_ip, int delay) {
 
 uint32_t Host::get_ip() {return ip;}
 
-std::vector<uint8_t> Host::get_mac() {return mac;}
+vector<uint8_t> Host::get_mac() {return mac;}
 
 int Host::get_frame_count() {return rx_frame_count;}
 
@@ -93,19 +178,30 @@ void Host::set_ip(uint32_t ip_addr) {
     ip = ip_addr;
 }
 
-void Host::set_mac(std::vector<uint8_t> mac_addr) {
+void Host::set_mac(vector<uint8_t> mac_addr) {
     mac = mac_addr;
 }
 
-void Host::set_port(Ethernet* tx_if, Ethernet* rx_if) {
-    // a port can be defined by its outgoing and incoming wires for the ethernet link
-    tx_interface = tx_if;
-    rx_interface = rx_if;
+void Host::connect_ethernet(EthernetLink* e_link, bool flip_wires) {
+    // the reason for flipping the wires involved in this link is that if we were to call the same
+    // function on both sides of the link without flipping the wires, both ends would be using
+    // the same link for transmissions and the same link for receptions, meaning nothing would get through
+    if (!flip_wires) {
+        tx_interface = e_link->get_wire_1();
+        rx_interface = e_link->get_wire_2();
+    } else {
+        rx_interface = e_link->get_wire_1();
+        tx_interface = e_link->get_wire_2();
+    }
 }
 
 void Host::receiver() {
+    // sometimes the processing of frames is delayed, so it is better to just remove the
+    // frame from the link and add it to the queue so that the link is cleared and the
+    // frame can be processed when the host has available resources
+
     // this is to be run in a thread that will wait on a condition variable to check the rx
-    // interface. 
+    // interface.
     while (1) {
         frame_queue->add(rx_interface->receive());
     }
@@ -118,7 +214,7 @@ void Host::demuxer() {
     // transfered out of the host and all others are processed
 
     MPDU* frame;
-    std::vector<uint8_t> destination_mac;
+    vector<uint8_t> destination_mac;
 
     while(1) {
         // get the next frame
@@ -141,46 +237,28 @@ void Host::demuxer() {
 void Host::send_MPDU(MPDU* frame) {
 
 #ifdef DEBUG
-    host_print("sending " +std::to_string(frame->get_size()) + " bytes to " + 
+    host_print("sending " +to_string(frame->get_size()) + " bytes to " + 
         mac_to_string(frame->get_destination_mac()));
 #endif
     // and that frame is sent out on the link
     tx_interface->transmit(frame);
 }
 
-void Host::process_frame(MPDU* frame, std::vector<uint8_t> destination_mac) {
+void Host::process_frame(MPDU* frame, vector<uint8_t> destination_mac) {
     // the contents of received frames will be processed in this function
-
-    std::chrono::duration<double> diff = std::chrono::high_resolution_clock::now() - host_start_time;
+    TCP tcp_segment;
+    UDP udp_segment;
 
     increment_frame_count();
-
-    // this frame was destined for this host, so print some details about the frame
-
-#ifdef FRAME_TIMES
-    std::string frame_descriptor;
-
-    if (is_broadcast(destination_mac)) {
-        frame_descriptor = "BROADCAST";
-    } else {
-        frame_descriptor = "UNICAST from " + mac_to_string(destination_mac);
-    }
-
-    std::string statement = std::to_string(get_frame_count()) + " " + std::to_string(diff.count()) 
-                            + " " + mac_to_string(frame->get_source_mac())
-                             + " " + std::to_string(frame->get_size()) + " " + frame_descriptor;
-    host_print(statement);
-#endif
-
        
     // here is where something would be done with the frame (e.g. go to running ping process)
     switch(frame->get_SDU_type()) {
-        case 0x0806:
+        case MPDU_ARP_TYPE:
             receive_arp(frame->get_SDU());
             delete frame;
             break;
 
-        case 0x0800: // IP packet  
+        case MPDU_IP_TYPE: // IP packet  
             // use the protocol of the frame to figure out how to proceed with the contents
             IP packet(frame->get_SDU());
             int socket_found = 0;
@@ -188,9 +266,10 @@ void Host::process_frame(MPDU* frame, std::vector<uint8_t> destination_mac) {
             switch(packet.get_protocol()) {
                 case IP_PROTOCOL_ICMP:
                     // this is a ping, so send the raw frame to the ICMP socket if it's open
-                    for (std::vector<Socket*>::iterator it = open_ports.begin(); 
+                    for (vector<Socket*>::iterator it = open_ports.begin(); 
                         it != open_ports.end();++it) {
 
+                        // check to see if this is an ICMP socket
                         if ((*it)->get_protocol() == IP_PROTOCOL_ICMP) {
                             socket_found = 1;
                             // give this frame to the running ping process' socket
@@ -203,6 +282,42 @@ void Host::process_frame(MPDU* frame, std::vector<uint8_t> destination_mac) {
                         // the generic ICMP processor and delete it
                         process_ICMP_message(frame);
                     }                                        
+                    break;
+                case IP_PROTOCOL_TCP:
+                    // this is a TCP segment, so retrieve the TCP object
+                    // NOTE: make function to determine the port based on the contents of the SDU
+                    tcp_segment = generate_TCP(packet.get_SDU());
+
+                    // There may be several flows running
+                    // so check to see which socket to use
+
+                    for (vector<Socket*>::iterator it = open_ports.begin(); 
+                        it != open_ports.end(); ++it) {
+
+                        // check to see if this port represents a TCP socket and is the same
+                        if ((*it)->get_protocol() == IP_PROTOCOL_TCP && (*it)->get_port() == tcp_segment.destination_port) {
+                            // send the frame to this port if so
+                            (*it)->add_frame(frame);
+                        }
+                    }
+                    break;
+                case IP_PROTOCOL_UDP:
+                    // this is a TCP segment, so retrieve the UDP object
+                    // NOTE: make function to determine the port based on the contents of the SDU
+                    udp_segment = generate_UDP(packet.get_SDU());
+
+                    // There may be several flows running
+                    // so check to see which socket to use
+
+                    for (vector<Socket*>::iterator it = open_ports.begin(); 
+                        it != open_ports.end(); ++it) {
+
+                        // check to see if this port represents a TCP socket and is the same
+                        if ((*it)->get_protocol() == IP_PROTOCOL_UDP && (*it)->get_port() == udp_segment.destination_port) {
+                            // send the frame to this port if so
+                            (*it)->add_frame(frame);
+                        }
+                    }
                     break;
             }
             break;
@@ -236,7 +351,7 @@ void Host::fill_ping_payload(ICMP* ping_to_send) {
 
 void Host::ping(uint32_t destination_ip, int count) {
 
-    std::vector<uint8_t> destination_mac;
+    vector<uint8_t> destination_mac;
 
     // check to see how this ping should be handled
     if (in_subnet(ip,destination_ip,netmask)) {
@@ -292,7 +407,7 @@ void Host::ping(uint32_t destination_ip, int count) {
     ICMP    rx_ping;
     IP      rx_ip;
 
-    std::vector<float> test_times;
+    vector<float> test_times;
     test_times.reserve(count);
     int transmission_attempts = 0;
     int receptions = 0;
@@ -315,8 +430,8 @@ void Host::ping(uint32_t destination_ip, int count) {
         ping_mpdu->encap_SDU(ip_to_send);
         ping_mpdu->set_source_mac(mac);
         ping_mpdu->set_destination_mac(destination_mac);
-        std::chrono::time_point<std::chrono::high_resolution_clock> ping_send_time = 
-            std::chrono::high_resolution_clock::now();
+        chrono::time_point<chrono::high_resolution_clock> ping_send_time = 
+            chrono::high_resolution_clock::now();
 
         send_MPDU(ping_mpdu);  
         transmission_attempts++;
@@ -359,14 +474,15 @@ void Host::ping(uint32_t destination_ip, int count) {
         } while (rx_ping.type != ICMP_ECHO_REPLY/*|| timeout*/);
 
         // print the results for this iteration, be it a clean reception or a timeout
-        std::chrono::duration<double, std::milli> diff = std::chrono::high_resolution_clock::now() 
+        chrono::duration<double, milli> diff = chrono::high_resolution_clock::now() 
                                                                 - ping_send_time;
 
         test_times.push_back((float)(diff.count()));
-
+#ifdef DEBUG
         host_print("[PING] " + to_string(rx_ip.get_total_length() - rx_ip.get_header_length()) + 
             " bytes from " + mac_to_string(rx_frame->get_source_mac()) + ": icmp_seq=" + 
             to_string(rx_ping.sequence_number) + " time=" + to_string(diff.count()) + " ms");
+#endif
 
         delete rx_frame;
 
@@ -385,7 +501,7 @@ void Host::ping(uint32_t destination_ip, int count) {
 
 }
 
-void Host::print_ping_statistics(int transmissions, int receptions, std::vector<float> ping_times) {
+void Host::print_ping_statistics(int transmissions, int receptions, vector<float> ping_times) {
     // print all the details surrounding the pings
 
     float total_time = 0;
@@ -480,7 +596,7 @@ Socket* Host::create_socket(uint16_t requested_port_number = 1, uint8_t protocol
     if (open_ports.size() > 0) { 
         do
         {   
-            for (std::vector<Socket*>::iterator it = open_ports.begin(); it != open_ports.end(); ++it) {
+            for (vector<Socket*>::iterator it = open_ports.begin(); it != open_ports.end(); ++it) {
                 if ((*it)->get_port() == test_port_number) {
                     // the port number has already been taken, so see if the next value works
                     port_found = 0;
@@ -501,7 +617,7 @@ Socket* Host::create_socket(uint16_t requested_port_number = 1, uint8_t protocol
 }
 
 void Host::delete_socket(uint16_t port_num) {
-    for (std::vector<Socket*>::iterator it = open_ports.begin(); it != open_ports.end();) {
+    for (vector<Socket*>::iterator it = open_ports.begin(); it != open_ports.end();) {
         if ((*it)->get_port() == port_num) {
             delete *it;
             it = open_ports.erase(it);
@@ -528,14 +644,14 @@ void Host::send_request_arp(uint32_t requested_ip, int timeout) {
     arp.target_ip = requested_ip;
 
 
-// #ifdef DEBUG
+#ifdef DEBUG
     host_print("[ARP] Sending request to " + ip_to_string(requested_ip));
-// #endif
+#endif
 
     send_arp(arp,create_broadcast_mac());
 }
 
-void Host::send_arp(ARP tx_arp, std::vector<uint8_t> destination_mac) {
+void Host::send_arp(ARP tx_arp, vector<uint8_t> destination_mac) {
 
     // pack it in an IP frame
     MPDU* arp_mpdu = new MPDU;
@@ -547,7 +663,7 @@ void Host::send_arp(ARP tx_arp, std::vector<uint8_t> destination_mac) {
     send_MPDU(arp_mpdu);
 }
 
-void Host::receive_arp(std::vector<uint8_t> arp_u8) {
+void Host::receive_arp(vector<uint8_t> arp_u8) {
 
     
     ARP arp_rx = generate_ARP(arp_u8);
@@ -584,21 +700,643 @@ void Host::receive_arp(std::vector<uint8_t> arp_u8) {
             // send off the reply
             send_arp(arp_rx, arp_rx.target_mac);
         } else {
+#ifdef DEBUG
             host_print("[ARP] Unicast reply from " + ip_to_string(arp_rx.sender_ip) + " [" 
                 + mac_to_string(arp_rx.sender_mac) + "]");
+#endif
         }
     }
 }
 
-void Host::host_print(std::string statement) {
-    std::cout << setw(15) << name << ": " << statement << endl;
+void Host::host_print(string statement) {
+    cout << setw(15) << name << ": " << statement << endl;
 }
 
+void Host::TCP_client(const char* filename, uint16_t this_port, uint32_t dest_ip, uint16_t dest_port) {
+    // create socket to send and receive segments
+    MPDU * rx_frame, * tx_frame;
+    TCP tx_segment, rx_segment, waiting_segment;
+    IP rx_packet, tx_packet;
+    uint32_t expected_ACK;
+    uint32_t rx_SN, tx_SN, expected_SN;   
+    bool connection_established = false;
+    int bytes_loaded = 0;
+    size_t queue_size;
+    int triple_ACK_count;
+    int cwnd = 1;
 
-// int main() {
-//     // create 
+    // determine the maximum number of bytes that can be put in the payload and still
+    // make it across the network
+    int maximum_payload_bytes = MTU - TCP_HEADER_SIZE - IP_HEADER_SIZE - MPDU_HEADER_SIZE;
 
-//     // give it an address to ping
+    /* 
+    This is an important object for TCP, since TCP is very much concerned with reliable data transfer.
+    This container will house the segments that have to be transfered so that they don't need to be created
+    on the fly and dropped packets can be resent quickly.
+    */
+    vector<TCP> * segments_to_send = file_to_TCP_segments(filename, this_port, dest_port, maximum_payload_bytes);
 
-//     // make sure the frame is sent and the timeout message occurs
-// }
+    Socket * TCP_socket = create_socket(this_port, IP_PROTOCOL_TCP);
+
+    // check if the destination MAC address is known and ARP if it is not
+    vector<uint8_t> dest_mac = cache.get_mac(dest_ip);
+
+    if (is_broadcast(dest_mac)) {
+#ifdef L4_DEBUG
+        host_print("[TCP client] No MAC in ARP cache for IP " + ip_to_string(dest_ip) + ". ARPING");
+#endif
+        // there was no entry, so send an arp to get the mac
+        send_request_arp(dest_ip, DEFAULT_TIMEOUT);
+
+        // wait until the mac address has been found and added to the queue
+        while (is_broadcast(cache.get_mac(dest_ip))) {
+            usleep(100);
+        }
+
+        // the mac has been obtained, so get it
+        dest_mac = cache.get_mac(dest_ip);
+    }
+
+#ifdef L4_DEBUG
+    host_print("[TCP client] starting handshake");
+#endif
+
+    
+
+    // generate initial sync request
+    tx_segment.details = TCP_SYN;
+    tx_segment.sequence_number = TCP_INITIAL_SN;
+    tx_segment.ACK_number = TCP_INITIAL_SN;
+    tx_segment.source_port = this_port;
+    tx_segment.destination_port = dest_port;
+
+    while (true) {
+
+        // encap in IP
+        tx_packet.encap_SDU(tx_segment);
+
+        // set parameters (these details will remain the same for subsequent sends)
+        tx_packet.set_source_ip(ip);
+        tx_packet.set_destination_ip(dest_ip);
+
+        //encap in MPDU
+        tx_frame = new MPDU();
+        // set addressing
+        tx_frame->encap_SDU(tx_packet);
+        tx_frame->set_destination_mac(dest_mac);
+        tx_frame->set_source_mac(mac);
+
+        //send
+        send_MPDU(tx_frame);
+
+        // wait for reply
+        rx_frame = TCP_socket->get_frame();
+        rx_packet = generate_IP(rx_frame->get_SDU());
+        rx_segment = generate_TCP(rx_packet.get_SDU()); 
+
+    #ifdef L4_DEBUG
+        host_print("[TCP client] got reply");
+    #endif
+
+        if ((rx_segment.ACK_number == (tx_segment.sequence_number + 1)) && (rx_segment.details & TCP_SYNACK)) {
+            // the ACK number and SN jive and the proper flags are set, so the connection is established
+            // as far as the client is concerned
+
+    #ifdef L4_DEBUG
+            host_print("[TCP client] connection established");
+    #endif
+
+            // send the final ACK necessary to complete the sync on the server side
+
+            tx_segment.details = TCP_ACK; // this is the last segment in the sync
+            tx_segment.sequence_number = rx_segment.ACK_number;
+            tx_segment.ACK_number = rx_segment.sequence_number + 1;
+            // at this point the SN and ACK N should both be 1
+
+            tx_segment.destination_port = dest_port;
+            tx_segment.source_port = this_port;
+
+            // encap in IP
+            tx_packet.encap_SDU(tx_segment);
+
+            // encap in MPDU
+            tx_frame = new MPDU(); // generate a new frame
+
+            // set addressing
+            tx_frame->encap_SDU(tx_packet);
+            tx_frame->set_destination_mac(dest_mac);
+            tx_frame->set_source_mac(mac);
+
+            delete rx_frame; // consume the frame sent by the server
+
+    #ifdef L4_DEBUG
+            host_print("[TCP client] sending final sync ACK");
+    #endif
+            //send ACK
+            tx_interface->transmit(tx_frame);
+
+            break;
+        } else {
+            // keep resending the SYN frame until we get a SYNACK back
+            // this will not happen in our case, since nothing should show up at this socket unless
+            // the SYN was heard and replied to with a SYNACK
+    #ifdef L4_DEBUG
+            host_print("[TCP client] did not get proper SYNACK");
+    #endif      
+            continue;
+        }
+    }
+
+
+#ifdef L4_DEBUG
+    host_print("[TCP client] handshake successful");
+#endif
+    int next_segment_index = 0;
+    int last_unACKd_index = 0;
+
+    while (last_unACKd_index < segments_to_send->size()) {
+        if (next_segment_index < segments_to_send->size()) {
+            // load the segment
+            tx_segment = segments_to_send->at(next_segment_index++);
+
+            // encap in IP
+            tx_packet.encap_SDU(tx_segment);
+
+            // encap in MPDU
+            tx_frame = new MPDU(); // generate a new frame
+            tx_frame->encap_SDU(tx_packet);
+
+            // set addressing
+            tx_frame->set_destination_mac(dest_mac);
+            tx_frame->set_source_mac(mac);
+
+#ifdef L4_DEBUG
+            host_print("[TCP client] sending segment, ACK with " + to_string(tx_segment.sequence_number + 
+                tx_segment.payload.size()));
+#endif
+
+            send_MPDU(tx_frame);
+        }
+
+        // wait for the ack and then send a frame. Note that, because of the loop, a second frame is sent out,
+        // which means that the cwnd will double with each new volley of segments
+
+        triple_ACK_count = 0; // used to see if the window should be reduced
+
+        rx_frame = TCP_socket->get_frame();
+        rx_packet = generate_IP(rx_frame->get_SDU());
+        rx_segment = generate_TCP(rx_packet.get_SDU()); 
+
+
+
+        // get the next segment we expected to be ACk'd
+        waiting_segment = segments_to_send->at(last_unACKd_index);
+        expected_SN = waiting_segment.sequence_number + waiting_segment.payload.size();
+
+        // for the last transmission to have been successful,  the ACK number must be what we expect to use 
+        // as the next SN or higher
+        if (rx_segment.ACK_number != expected_SN) {
+#ifdef L4_DEBUG
+            host_print("[TCP client] expected ACK " + to_string(waiting_segment.sequence_number + 
+                waiting_segment.payload.size()) + ", got " + to_string(rx_segment.ACK_number));
+#endif
+            
+            if (rx_segment.ACK_number > expected_SN ) {
+                // this might not be the expected ACK, but it signifies that previous segments were received
+                // properly and so we can update up to which value fo segment was received
+                while (true) {
+                    waiting_segment = segments_to_send->at(++last_unACKd_index);
+                    if (rx_segment.ACK_number ==  waiting_segment.sequence_number + waiting_segment.payload.size()) {
+                        last_unACKd_index++;
+                        break;
+                    }
+                }
+
+            } else {
+                // check to see if the window should be reduced
+                triple_ACK_count++;
+                if (triple_ACK_count == 3) {
+                    if (cwnd > 2) {
+                        cwnd /= 2;
+                    }
+                    triple_ACK_count = 0;
+                    // break;
+                }
+            }
+
+
+        } else {
+            // the segment was successfuly ACK'd, so increase the index for the segment we are waiting to
+            // be ACK'd
+#ifdef L4_DEBUG
+            host_print("[TCP client] segment ACK'd with " + to_string(rx_segment.ACK_number));
+#endif
+            last_unACKd_index++;
+        }
+
+        if ((rx_segment.details & TCP_FIN) && (rx_segment.details & TCP_ACK)) {
+            // the final segment has been acked, so we are finished and no longer need to send segments
+#ifdef L4_DEBUG
+            host_print("[TCP client] final segment ACK'd");
+            // cout << "client: "  << rx_segment.details << " " << (rx_segment.details & TCP_FINACK) <<
+            // " " << TCP_FINACK << endl;
+#endif
+            break;
+        }
+            
+        if (next_segment_index < segments_to_send->size()) {
+            // load the segment
+            tx_segment = segments_to_send->at(next_segment_index++);
+
+            // encap in IP
+            tx_packet.encap_SDU(tx_segment);
+
+            // encap in MPDU
+            tx_frame = new MPDU(); // generate a new frame
+            tx_frame->encap_SDU(tx_packet);
+
+            // set addressing
+            tx_frame->set_destination_mac(dest_mac);
+            tx_frame->set_source_mac(mac);
+
+#ifdef L4_DEBUG
+            host_print("[TCP client] sending segment, ACK with " + to_string(tx_segment.sequence_number + 
+                tx_segment.payload.size()));
+#endif
+
+            send_MPDU(tx_frame);
+        }
+    }
+
+    delete_socket(TCP_socket->get_port());
+
+    delete segments_to_send;
+
+#ifdef L4_DEBUG
+    host_print("[TCP client] finished");
+#endif
+}
+
+void Host::TCP_server(const char * filename, uint16_t this_port) {
+    vector<uint8_t> payload_file; // structure to hold the contents of the file being sent
+    size_t payload_size = 0;
+    MPDU * rx_frame, * tx_frame;
+    TCP tx_segment, rx_segment;
+    IP rx_packet, tx_packet;
+    uint32_t rx_ACK_n, tx_ACK_n;
+    uint32_t last_rx_SN;
+    bool connection_established = false;
+    int last_payload_size = 0;
+
+
+    // create a socket to send and receive segments
+    Socket * TCP_socket = create_socket(this_port, IP_PROTOCOL_TCP);
+
+
+    // listening for initial SYN
+    rx_frame = TCP_socket->get_frame();
+    rx_packet = generate_IP(rx_frame->get_SDU());
+    rx_segment = generate_TCP(rx_packet.get_SDU());
+
+#ifdef L4_DEBUG
+    host_print("[TCP server] received SYN");
+#endif
+
+
+    while(!(rx_segment.details & TCP_SYN)) {
+#ifdef L4_DEBUG
+        host_print("[TCP server] invalid SYN");
+#endif
+        // wait for SYN segment
+        delete rx_frame;
+        rx_frame = TCP_socket->get_frame();
+        rx_packet = generate_IP(rx_frame->get_SDU());
+        rx_segment = generate_TCP(rx_packet.get_SDU());
+    }
+
+#ifdef L4_DEBUG
+    host_print("[TCP server] valid SYN");
+#endif
+
+
+    // host_print("Got SYN segment");
+
+    // SYN received, send SYNACK
+    tx_segment.details = TCP_SYNACK;
+
+    tx_segment.sequence_number = TCP_INITIAL_SN;
+    tx_segment.ACK_number = rx_segment.sequence_number + 1;
+
+    tx_segment.destination_port = rx_segment.source_port;
+    tx_segment.source_port = this_port;
+
+    // encap in IP
+    tx_packet.encap_SDU(tx_segment);
+    // set parameters (these details will remain the same for subsequent sends)
+    tx_packet.set_source_ip(ip);
+    tx_packet.set_destination_ip(rx_packet.get_source_ip());
+
+    //encap in MPDU
+    tx_frame = new MPDU();
+    // set addressing
+    tx_frame->encap_SDU(tx_packet);
+    tx_frame->set_destination_mac(rx_frame->get_source_mac());
+    tx_frame->set_source_mac(mac);
+
+    delete rx_frame;
+
+    //send SYNACK
+    send_MPDU(tx_frame);
+
+#ifdef L4_DEBUG
+    host_print("[TCP server] SYNACK sent");
+#endif
+
+
+    // upon receiving this frame, the client will have established their connection
+    // but the server still needs to wait on a frame with ACK_number = the SN of the segment that was sent + 1
+
+    // listening for final ACK of threeway handshake
+    rx_frame = TCP_socket->get_frame();
+    rx_packet = generate_IP(rx_frame->get_SDU());
+    rx_segment = generate_TCP(rx_packet.get_SDU()); 
+
+
+    while (!(rx_segment.ACK_number == (tx_segment.sequence_number + 1)) || !(rx_segment.details & TCP_ACK)) {
+        // this is not the frame were were expecting, and so the sync is not complete yet
+        // so resend the SYNACK (in practice this shouldn't occur)
+
+        //encap in MPDU
+        tx_frame = new MPDU();
+        // set addressing
+        tx_frame->encap_SDU(tx_packet);
+        tx_frame->set_destination_mac(rx_frame->get_source_mac());
+        tx_frame->set_source_mac(mac);
+
+        delete rx_frame;
+
+        //send SYNACK
+        send_MPDU(tx_frame);
+
+    }
+
+    // save this sequence number value for reliable data transfer
+    last_rx_SN = rx_segment.sequence_number;
+
+    // the ACK number and SN jive and the proper flags are set, so the connection is established on both ends
+    connection_established = true;
+
+    // open an output stream to write to a file
+    ofstream ofs;
+    ofs.open(filename, ofstream::out);
+
+#ifdef L4_DEBUG
+    host_print("[TCP server] connection established");
+#endif
+
+
+
+    do {
+        // listen for segments, send ACKs, build file, wait for FIN bit
+        rx_frame = TCP_socket->get_frame();
+        rx_packet = generate_IP(rx_frame->get_SDU());
+        rx_segment = generate_TCP(rx_packet.get_SDU());
+
+        // cout << "serverexpected: " <<  last_rx_SN + last_payload_size << "\t got: " << rx_segment.sequence_number << endl;
+
+        // for this to be the right segment, the sequence number of the received segment must be equal to the
+        // sequence number of the previous segment + the payload size of the previous segment
+        if (rx_segment.sequence_number == last_rx_SN + last_payload_size) {
+            // confirmed that this is the next expected segment
+#ifdef L4_DEBUG
+            host_print("[TCP server] got next segment, SN = " + to_string(rx_segment.sequence_number) + " data size = " +
+                to_string(rx_segment.payload.size()));
+#endif
+
+            // update the last values
+            last_rx_SN = rx_segment.sequence_number;
+            last_payload_size = rx_segment.payload.size();
+
+            // write payload contents
+            for (int i = 0; i < last_payload_size; ++i) {
+                ofs.put(rx_segment.payload[i]);
+            }
+
+            //prepare ACK
+            tx_segment.details = rx_segment.details;
+            tx_segment.details |= TCP_ACK;
+
+            tx_segment.sequence_number = rx_segment.ACK_number;
+            tx_segment.ACK_number = last_rx_SN + last_payload_size;
+
+            // encap in IP
+            tx_packet.encap_SDU(tx_segment);
+
+            // ports should not have changed from last transmission
+
+            //encap in MPDU
+            tx_frame = new MPDU();
+            // set addressing
+            tx_frame->encap_SDU(tx_packet);
+            tx_frame->set_destination_mac(rx_frame->get_source_mac());
+            tx_frame->set_source_mac(mac);
+
+            delete rx_frame;
+
+#ifdef L4_DEBUG
+            host_print("[TCP server] sending ACK " + to_string(tx_segment.ACK_number));
+#endif
+
+            send_MPDU(tx_frame);
+
+        } else {
+            // error, resend most recent ACK
+#ifdef L4_DEBUG
+            host_print("[TCP server] error with segment, expected " + to_string(last_rx_SN + last_payload_size) +
+                ", got " + to_string(rx_segment.sequence_number));
+#endif
+
+            //encap in MPDU the last tx_packet that was created, since that's the ACK for the last successfully
+            // received segment
+            tx_frame = new MPDU();
+            // set addressing
+            tx_frame->encap_SDU(tx_packet);
+            tx_frame->set_destination_mac(rx_frame->get_source_mac());
+            tx_frame->set_source_mac(mac);
+
+#ifdef L4_DEBUG
+            host_print("[TCP server] sending ACK " + to_string(tx_segment.ACK_number));
+#endif
+            send_MPDU(tx_frame);
+
+            delete rx_frame;
+
+        }
+
+        // cout << "server: " << tx_segment.details << " " << (tx_segment.details & TCP_FIN) << endl;
+
+        // if the transmitted segment has FIN set, then the client is just waiting for a final ACK
+        // and will not longer send segments (unless this segment is lost)
+    } while (!(tx_segment.details & TCP_FIN));
+
+#ifdef L4_DEBUG
+    host_print("[TCP server] finished receiving, writing to file");
+#endif
+
+    // save file
+    ofs.close();
+
+    delete_socket(TCP_socket->get_port());
+
+#ifdef L4_DEBUG
+    host_print("[TCP server] finished");
+#endif
+
+}
+
+void Host::UDP_client(const char* filename, uint16_t this_port, uint32_t dest_ip, uint16_t dest_port) {
+    // UDP has no connection, so we just assume that the server is running and fire away with packets.
+    // it is the responsibility of higher layers to make sure that the contents arrive without error and
+    // that all missing segments are retrieved, so this should be a pretty simple implementation for now
+
+    MPDU * rx_frame, * tx_frame; // we need to delete the rx_frame and have the tx_frame deleted on the other end
+    IP rx_packet, tx_packet;
+    UDP rx_segment, tx_segment;
+    int bytes_loaded = 0;
+    int next_segment_index = 0;
+    // rx objects will be used later on for requesting missed segments
+
+    Socket * UDP_socket = create_socket(this_port, IP_PROTOCOL_UDP);
+
+    int maximum_payload_bytes = MTU - UDP_HEADER_SIZE - IP_HEADER_SIZE - MPDU_HEADER_SIZE;
+
+    vector<UDP> * segments_to_send = file_to_UDP_segments(filename, this_port, dest_port, maximum_payload_bytes);
+
+    // check if the destination MAC address is known and ARP if it is not
+    vector<uint8_t> dest_mac = cache.get_mac(dest_ip);
+
+    if (is_broadcast(dest_mac)) {
+#ifdef L4_DEBUG
+        host_print("[UDP client] No MAC in ARP cache for IP " + ip_to_string(dest_ip) + ". ARPING");
+#endif
+        // there was no entry, so send an arp to get the mac
+        send_request_arp(dest_ip, DEFAULT_TIMEOUT);
+
+        // wait until the mac address has been found and added to the queue
+        while (is_broadcast(cache.get_mac(dest_ip))) {
+            usleep(100);
+        }
+
+        // the mac has been obtained, so get it
+        dest_mac = cache.get_mac(dest_ip);
+    }
+
+    tx_segment.source_port = this_port;
+    tx_segment.destination_port = dest_port;
+
+    // set IP parameters (these details will remain the same for subsequent sends)
+    tx_packet.set_source_ip(ip);
+    tx_packet.set_destination_ip(dest_ip);
+
+    // not working with checksums yet because bytes are not being corrupted yet
+
+    bool HOST_EOF_reached = false;
+
+#ifdef L4_DEBUG
+    host_print("[UDP client] beginning to send file");
+#endif
+
+
+    while (!HOST_EOF_reached) {
+
+        tx_segment = segments_to_send->at(next_segment_index++);
+
+
+        // encap in IP
+        tx_packet.encap_SDU(tx_segment);
+
+        // encap in MPDU
+        tx_frame = new MPDU(); // generate a new frame
+        tx_frame->encap_SDU(tx_packet);
+
+        // set addressing
+        tx_frame->set_destination_mac(dest_mac);
+        tx_frame->set_source_mac(mac);
+
+#ifdef L4_DEBUG
+        host_print("[UDP client] sending segment");
+#endif
+
+        send_MPDU(tx_frame);
+    }
+
+
+#ifdef L4_DEBUG
+    host_print("[UDP client] file send complete, deleting socket");
+#endif
+
+    delete_socket(UDP_socket->get_port());
+
+}
+
+void Host::UDP_server(const char * filename, uint16_t this_port) {
+    // as mentioned with the client, this is more or less a run and receive function that will take incoming packets
+    // and form the payload into a file. future implementations could work with go-back-n or selective repeat.
+    // additionally, it appears as though a "stream index" is used to differentiate between different UDP flows
+    // so the server should probably spawn a new wqueue and thread for each incoming connection in the future
+
+    MPDU * rx_frame, * tx_frame; // we need to delete the rx_frame and have the tx_frame deleted on the other end
+    IP rx_packet, tx_packet;
+    UDP rx_segment, tx_segment;
+    // tx objects will be used later on for requesting missed segments
+
+    Socket * UDP_socket = create_socket(this_port, IP_PROTOCOL_UDP);
+
+    // open an output stream to write to a file
+    ofstream ofs;
+    ofs.open(filename, ofstream::out);
+
+    bool HOST_EOF_reached = false;
+
+#ifdef L4_DEBUG
+    host_print("[UDP server] waiting for segments");
+#endif
+
+    while (!HOST_EOF_reached) {
+
+        // for the moment, the file will be written when the end of file character is seen
+        rx_frame = UDP_socket->get_frame();
+        rx_packet = generate_IP(rx_frame->get_SDU());
+        rx_segment = generate_UDP(rx_packet.get_SDU());
+
+#ifdef L4_DEBUG
+    host_print("[UDP server] segment received");
+#endif
+
+        if (rx_segment.payload.back() == HOST_EOF) {
+            HOST_EOF_reached = true;
+            rx_segment.payload.pop_back();
+        }
+
+        for (int i = 0; i < rx_segment.payload.size(); ++i) {
+            ofs.put(rx_segment.payload[i]);
+        }
+
+        delete rx_frame;
+    }
+
+#ifdef L4_DEBUG
+    host_print("[UDP server] final segment received, writing to file");
+#endif
+
+    // save file
+    ofs.close();
+
+#ifdef L4_DEBUG
+    host_print("[UDP server] file written, closing socket");
+#endif
+
+    delete_socket(UDP_socket->get_port());
+
+
+}

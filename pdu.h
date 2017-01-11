@@ -8,65 +8,14 @@
 #include "l3_protocols.h"
 #include "wqueue.h"
 
-/*
-This is the class that will be our interface, since what is an interface if not
-just a pointer to a MPDU on a link?
-*/
-
 using namespace std;
 
-#define IP_PROTOCOL_ICMP    0x01
-#define IP_PROTOCOL_TCP     0x06
-#define IP_PROTOCOL_UDP    0x11
+#define MPDU_ARP_TYPE 0x0806
+#define MPDU_IP_TYPE  0x0800
 
-class TCP {
-    public:
-        TCP(); // default constructor
-        ~TCP();
-        size_t get_size();
-        void erase();   // reset the MPDU to be blank
-        TCP* copy();
-    private:
-        size_t SDU_length;
-        std::vector<uint8_t> SDU;
-};
 
-struct UDP {
-    size_t SDU_length;
-    std::vector<uint8_t> SDU;
-};
+#define MPDU_HEADER_SIZE    12  
 
-class IP { 
-    public:
-        IP();
-        IP(ICMP);
-        IP(TCP);
-        IP(UDP);
-        IP(std::vector<uint8_t>);
-        void encap_SDU(ICMP);
-        void encap_SDU(TCP);
-        void encap_SDU(UDP);
-        void set_source_ip(uint32_t);
-        void set_destination_ip(uint32_t);
-        uint32_t get_source_ip();
-        uint32_t get_destination_ip();
-        uint8_t get_protocol();
-        uint16_t get_SDU_length();
-        uint8_t get_header_length();
-        uint16_t get_total_length();
-        std::vector<uint8_t> get_SDU();
-        ~IP();
-    private:     
-        uint8_t header_length;
-        uint16_t total_length;
-        uint8_t protocol;
-        uint32_t source_ip;
-        uint32_t destination_ip;
-
-        std::vector<uint8_t> SDU;
-};
-
-IP generate_IP(std::vector<uint8_t>);
 
 class MPDU {
     public:
@@ -86,7 +35,6 @@ class MPDU {
     private:
         std::vector<uint8_t> source_mac;
         std::vector<uint8_t> destination_mac;
-        size_t SDU_length;
         uint16_t SDU_type;
         std::vector<uint8_t> SDU;
 };
@@ -95,10 +43,11 @@ class Socket {
     public:
         Socket(uint16_t, uint8_t);
         ~Socket();
-        MPDU* get_frame();
-        void add_frame(MPDU*);
-        uint16_t get_port();
-        uint8_t get_protocol();
+        MPDU* get_frame(){return rx_queue->remove();}
+        void add_frame(MPDU* frame_to_add) {rx_queue->add(frame_to_add);}
+        uint16_t get_port() {return port;}
+        uint8_t get_protocol() {return protocol;}
+        size_t queue_size() {return rx_queue->size();}
     private:
         uint16_t port;
         uint8_t protocol;

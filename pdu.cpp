@@ -4,8 +4,10 @@
 #include <cstdint>
 #include <vector>
 #include "l3_protocols.h"
+#include "l4_protocols.h"
 #include "addressing.h"
 #include <sstream>
+#include <fstream>
 
 /*
     MPDUs are the objects that will move around the network, being
@@ -15,7 +17,7 @@
 using namespace std;
 
 Socket::Socket(uint16_t port_number, uint8_t protocol_number) {
-    rx_queue = new wqueue<MPDU*>;
+    rx_queue = new wqueue<MPDU*>("", false);
     port = port_number;
     protocol = protocol_number;
 }
@@ -24,113 +26,6 @@ Socket::~Socket() {
     delete rx_queue;
 }
 
-MPDU* Socket::get_frame() {
-    return rx_queue->remove();
-}
-
-void Socket::add_frame(MPDU* frame_to_add) {
-    rx_queue->add(frame_to_add);
-}
-
-uint16_t Socket::get_port() {
-    return port;
-}
-
-uint8_t Socket::get_protocol() {
-    return protocol;
-}
-
-
-
-
-IP::IP(){
-    header_length = 12; // header_length + total_length + protocol + source and dest IPs
-}
-IP::IP(ICMP){}
-IP::IP(TCP){}
-IP::IP(UDP){}
-
-// take a u8 version of the IP frame and create an IP object from it
-IP::IP(std::vector<uint8_t> ip_u8) {
-
-    int i = 0;
-    // uint8_t header_length;
-    header_length = ip_u8[0];
-
-    // uint16_t total_length;
-    total_length = ((uint16_t)(ip_u8[1]) << 8) + ip_u8[2];
-
-    // uint8_t protocol;
-    protocol = ip_u8[3];
-
-    // uint32_t source_ip;
-    source_ip = create_ip(ip_u8[4],ip_u8[5],ip_u8[6],ip_u8[7]);
-
-    // uint32_t destination_ip;
-    destination_ip = create_ip(ip_u8[8],ip_u8[9],ip_u8[10],ip_u8[11]);
-
-    // std::vector<uint8_t> SDU;
-    SDU.reserve(total_length - header_length);
-    for (int i = 0; i < total_length - header_length; i++) {
-        SDU.push_back(ip_u8[i+12]);
-    }
-}
-
-
-void IP::encap_SDU(ICMP new_ICMP) {
-    // set the type since we know it's ARP
-
-    protocol = IP_PROTOCOL_ICMP; // ICMP
-
-    // cout << "header length set to " << std::to_string(header_length) << endl;
-
-    SDU.clear();
-    SDU.reserve(8 + new_ICMP.payload.size());
-
-    int j = 0;
-
-    SDU.push_back(new_ICMP.type);
-    SDU.push_back(new_ICMP.code);
-
-    for (int i = 1; i >= 0; i--) {
-        SDU.push_back((new_ICMP.checksum >> (i*8)) & 0xFF);
-    }
-
-    for (int i = 1; i >= 0; i--) {
-        SDU.push_back((new_ICMP.identifier >> (i*8)) & 0xFF);
-    }
-
-    for (int i = 1; i >= 0; i--) {
-        SDU.push_back((new_ICMP.sequence_number >> (i*8)) & 0xFF);
-    }
-
-    for (int i = 0; i < new_ICMP.payload.size(); i++) {
-        SDU.push_back(new_ICMP.payload[i]);
-    }
-
-    total_length = header_length + SDU.size();
-
-}
-void IP::encap_SDU(TCP) {}
-void IP::encap_SDU(UDP) {}
-IP::~IP() {}
-
-void IP::set_source_ip(uint32_t input_source_ip) {source_ip = input_source_ip;}
-void IP::set_destination_ip(uint32_t input_destination_ip) {destination_ip = input_destination_ip;}
-uint8_t IP::get_header_length() {return header_length;}
-uint16_t IP::get_total_length() {return total_length;}
-uint32_t IP::get_source_ip() {return source_ip;}
-uint32_t IP::get_destination_ip() {return destination_ip;}
-uint8_t IP::get_protocol() {return protocol;}
-uint16_t IP::get_SDU_length() {return SDU.size();}
-std::vector<uint8_t> IP::get_SDU() {return SDU;}
-
-IP generate_IP(std::vector<uint8_t> ip_u8) {
-
-    IP to_return(ip_u8);
-
-    return to_return;
-}
 
 
 
@@ -151,7 +46,7 @@ std::vector<uint8_t> MPDU::get_source_mac() { return source_mac; }
 
 std::vector<uint8_t> MPDU::get_destination_mac() { return destination_mac; }
         
-size_t MPDU::get_size() {return 12 + SDU_length;}
+size_t MPDU::get_size() {return MPDU_HEADER_SIZE + SDU.size();}
 
 void MPDU::set_source_mac(std::vector<uint8_t> mac) {
     source_mac = mac;
@@ -166,8 +61,6 @@ void MPDU::encap_SDU(IP new_IP) {
 
     // set the type since we know it's IP
     SDU_type = 0x0800;
-
-    SDU_length = new_IP.get_total_length();
 
     // and since we know it's IP, we know what the headers are and how much space they
     // take up, so we can copy the contents, byte by byte into the SDU (since the 
@@ -209,9 +102,8 @@ void MPDU::encap_SDU(ARP new_ARP) {
     // set the type since we know it's ARP
     SDU_type = 0x0806;
 
-    SDU_length = 22;
     SDU.clear();
-    SDU.reserve(SDU_length);
+    SDU.reserve(22); // standard ARP size for this simulator
 
     int j = 0;
 
@@ -270,6 +162,76 @@ void print_bytes(void* to_print, int number_of_bytes) {
 //         cout << std::hex << (int)(printer[i]) << " ";
 //     }
 //     cout << endl;
+// }
+
+
+// int main() {
+
+//     uint32_t my_ip = create_ip(1,1,1,1);
+//     uint32_t dest_ip = create_ip(2,2,2,2);
+
+//     // make a TCP frame, load up values
+//     TCP test_segment;
+//     test_segment.source_port = 30000;
+//     test_segment.destination_port = 50000;
+//     test_segment.sequence_number = 51231;
+//     test_segment.ACK_number = 12341;
+//     test_segment.details = 0x01; //FIN
+//     test_segment.receive_window = 20;
+
+//     // open the test text file and load it into the segment
+//     std::ifstream ifs;
+//     ifs.open ("test.txt", ifstream::in);
+//     char c = ifs.get();
+
+//     while (ifs.good()) {
+//         test_segment.payload.push_back((uint8_t)c);
+
+//         c = ifs.get();
+//     }
+
+//     ifs.close();
+
+//     // encap in IP
+
+//     IP first_ip;
+//     first_ip.set_destination_ip(dest_ip);
+//     first_ip.set_source_ip(my_ip);
+//     first_ip.encap_SDU(test_segment);
+
+//     // encap in MPDU
+
+//     MPDU test_mpdu;
+//     test_mpdu.encap_SDU(first_ip);
+
+//     // de-encap in IP
+//     IP second_ip = generate_IP(test_mpdu.get_SDU());
+
+//     // de-encap in TCP
+//     TCP second_tcp = generate_TCP(second_ip.get_SDU());
+
+
+
+//     cout << second_tcp.source_port << endl;
+//     cout << second_tcp.destination_port << endl;
+//     cout << second_tcp.sequence_number << endl;
+//     cout << second_tcp.ACK_number << endl;
+//     cout << second_tcp.details << endl;
+//     cout << second_tcp.receive_window << endl;
+
+//     std::ofstream ofs;
+//     ofs.open("test_1.txt", ofstream::out);
+
+//     for (int i = 0; i < second_tcp.payload.size(); ++i) {
+//         ofs.put(second_tcp.payload[i]);
+//     }
+
+//     ofs.close();
+
+
+//     // TCP_sender * my_sender = new TCP_sender(my_ip, my_port, dest_ip, dest_port);
+
+
 // }
 
 

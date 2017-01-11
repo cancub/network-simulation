@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = -I. -std=c++11 -pthread
-DEPS = host.o pdu.o frame_generators.o addressing.o data_links.o networking_devices.o l3_protocols.o wqueue.h
+DEPS = host.o md5.o pdu.o frame_generators.o addressing.o data_links.o networking_devices.o l4_protocols.o l3_protocols.o sim_tcpdump.o wqueue.h
 
 test: test.o $(DEPS)
 	$(CXX) $(CXXFLAGS) -o test test.o $(DEPS) -I.

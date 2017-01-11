@@ -25,8 +25,9 @@
 #define __wqueue_h__
 
 #include <mutex>
-#include <condition_variable> // std::condition_variable
+#include <condition_variable> // condition_variable
 #include <list>
+#include <iostream>
 
 using namespace std;
 
@@ -35,13 +36,14 @@ using namespace std;
 template <typename T> class wqueue
 {
     list<T>             m_queue;
-    std::mutex*              m_mutex;
-    condition_variable*      m_condv; 
+    mutex*              m_mutex;
+    condition_variable*      m_condv;
     int max_entries;
 
     public:
         wqueue() {
-            m_mutex = new std::mutex;
+            // cout << "new queue and printing  = " << (print_counts? "yes" : "no") << endl;
+            m_mutex = new mutex;
             m_condv = new condition_variable;
             max_entries = MAX_QUEUE_LENGTH;
         }
@@ -50,8 +52,7 @@ template <typename T> class wqueue
             // delete m_condv;
         }
         void add(T item) {
-            std::unique_lock<std::mutex> lck(*m_mutex);
-
+            unique_lock<mutex> lck(*m_mutex);
             if (m_queue.size() >= max_entries) {
                 // simulate a dropped frame due to heavy traffic load
                 lck.unlock();
@@ -61,12 +62,15 @@ template <typename T> class wqueue
             m_condv->notify_one();
         }
         T remove() {
-            std::unique_lock<std::mutex> lck(*m_mutex);
+            unique_lock<mutex> lck(*m_mutex);
             if (m_queue.size() == 0) {
                 m_condv->wait(lck);
             }
 
-            T item = m_queue.front();
+            T item = m_queue.front();            
+            // if (max_entries > 1 && do_print) {
+            //   cout << q_name << " " << m_queue.size() << endl;              
+            // }
             m_queue.pop_front();
             return item;
         }

@@ -3,9 +3,13 @@
 
 #include <mutex>
 #include <vector>
+#include <cstdint>
+#include <stdlib.h>
 #include "pdu.h"
-#include <condition_variable> // std::condition_variable
+#include <condition_variable> // condition_variable
 #include "wqueue.h"
+
+using namespace std;
 
 /*
 These are the links that will be used to connect nodes in the network.
@@ -22,20 +26,43 @@ It should simply be a well-described object that both ends of the link
 can actively engage while it just sits there.
 */
 
+#define FAILURES_PER_1000000
+#define CORRUPTIONS_PER_1000000
 
 
-class Ethernet {
-    /*
-    Thanks to the addition of the wqueue, use of the Ethernet link is extremely simple.
-    Just use wrapper functions for the wqueue's thread-safe prduction and consumption functions
-    */
+
+
+
+// the wire is what actuallt carries the information
+
+class EthernetWire {
+public:    
+    EthernetWire( chrono::time_point<chrono::high_resolution_clock> start_time, bool monitor, string name, int * fc_ptr);
+    ~EthernetWire();
+    void transmit(MPDU*);
+    MPDU* receive();
+private:
+    wqueue<MPDU*>* interface;
+    chrono::time_point<chrono::high_resolution_clock> link_start_time;
+    bool print_metadata;
+    string if_name;
+    int * frame_count_ptr;
+};
+
+// a link is comprised of two wires for bi-directional traffic
+
+class EthernetLink {
+    
     public:
-        Ethernet();
-        ~Ethernet();
-        void transmit(MPDU*);
-        MPDU* receive();
+        EthernetLink(bool monitor_interface = false, string name = "");
+        ~EthernetLink();
+        EthernetWire* get_wire_1(){return FD_wire_1;};
+        EthernetWire* get_wire_2(){return FD_wire_2;};
     private:
-        wqueue<MPDU*>* interface;
+        EthernetWire* FD_wire_1; // ethernet cables are full duplex
+        EthernetWire* FD_wire_2;
+        bool print_metadata;
+        int frame_count; // keep track of number of frames received
 };
 
 class Air {};

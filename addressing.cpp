@@ -8,8 +8,8 @@
 
 using namespace std;
 
-std::vector<uint8_t> create_mac(uint8_t b1,uint8_t b2,uint8_t b3,uint8_t b4,uint8_t b5,uint8_t b6) {
-    std::vector<uint8_t> result; // we'll add 6 bytes to this mac
+vector<uint8_t> create_mac(uint8_t b1,uint8_t b2,uint8_t b3,uint8_t b4,uint8_t b5,uint8_t b6) {
+    vector<uint8_t> result; // we'll add 6 bytes to this mac
     result.reserve(6); 
 
     result.push_back(b1);
@@ -22,13 +22,13 @@ std::vector<uint8_t> create_mac(uint8_t b1,uint8_t b2,uint8_t b3,uint8_t b4,uint
     return result;
 }
 
-std::vector<uint8_t> create_random_mac() {
+vector<uint8_t> create_random_mac() {
     // as one might expect, this is a function
     // that takes no argument and generates
     // a random MAC address 
     
     int character_number;
-    std::vector<uint8_t> result; // we'll add 6 bytes to this mac
+    vector<uint8_t> result; // we'll add 6 bytes to this mac
     result.reserve(6); 
 
     for(int i = 0; i < 6; i++) {
@@ -38,8 +38,8 @@ std::vector<uint8_t> create_random_mac() {
     return result;
 }  
 
-std::vector<uint8_t> create_uniform_mac(uint8_t mac_byte) {
-    std::vector<uint8_t> result; // we'll add 6 bytes to this mac
+vector<uint8_t> create_uniform_mac(uint8_t mac_byte) {
+    vector<uint8_t> result; // we'll add 6 bytes to this mac
     result.reserve(6); 
     for (int i = 0; i < 6; i++) {
         result.push_back(mac_byte);
@@ -47,8 +47,8 @@ std::vector<uint8_t> create_uniform_mac(uint8_t mac_byte) {
     return result;
 }
 
-std::vector<uint8_t> create_broadcast_mac() {
-    std::vector<uint8_t> result; // we'll add 6 bytes to this mac
+vector<uint8_t> create_broadcast_mac() {
+    vector<uint8_t> result; // we'll add 6 bytes to this mac
     result.reserve(6); 
     for (int i = 0; i < 6; i++) {
         result.push_back(0xFF);
@@ -93,7 +93,7 @@ uint32_t create_broadcast_ip() {
     return 0xFFFFFFFF;
 }
 
-int compare_macs(std::vector<uint8_t> mac1, std::vector<uint8_t> mac2) {
+int compare_macs(vector<uint8_t> mac1, vector<uint8_t> mac2) {
     int result = 1;
     for (int i = 0; i < 6; i++){
         if (mac1[i] != mac2[i]){
@@ -107,7 +107,7 @@ int compare_ips(uint32_t ip1, uint32_t ip2) {
     return ip1 == ip2;
 }
 
-int is_broadcast(std::vector<uint8_t> address) {
+int is_broadcast(vector<uint8_t> address) {
     int result = 1;
     for(int i = 0; i < 6; i++) {
         if (address[i] != 0xFF) {
@@ -138,14 +138,14 @@ int in_subnet(uint32_t ip_1,uint32_t ip_2, uint32_t test_netmask) {
     return 1;
 }   
 
-std::string mac_to_string(std::vector<uint8_t> mac_addr){
+string mac_to_string(vector<uint8_t> mac_addr){
 
-    std::ostringstream convert;
+    ostringstream convert;
     for (int i = 0; i < 6; i++) {
         if (mac_addr[i] < 16) {
             convert << "0";
         }
-        convert << std::uppercase << std::hex << (int)mac_addr[i];
+        convert << uppercase << hex << (int)mac_addr[i];
         if (i < 5) {
             convert << ":";
         }
@@ -155,8 +155,27 @@ std::string mac_to_string(std::vector<uint8_t> mac_addr){
 
 }
 
-std::string ip_to_string(uint32_t ip_addr){
-    std::ostringstream convert;
+string mac_to_string(vector<uint8_t>* mac_vector, int first_index){
+
+    ostringstream convert;
+    uint8_t current_byte;
+    for (int i = first_index; i < first_index+ 6; i++) {
+        current_byte = mac_vector->at(i);
+        if (current_byte < 16) {
+            convert << "0";
+        }
+        convert << uppercase << hex << (int)current_byte;
+        if (i < first_index+ 5) {
+            convert << ":";
+        }
+    }
+
+    return convert.str();
+
+}
+
+string ip_to_string(uint32_t ip_addr){
+    ostringstream convert;
     for (int i = 3; i >= 0; i--) {
         convert << (int)((ip_addr >> (i*8)) & 0x000000FF);
         if (i > 0) {
@@ -167,15 +186,31 @@ std::string ip_to_string(uint32_t ip_addr){
     return convert.str();
 }
 
+string ip_to_string(vector<uint8_t> * ip_vector, int first_index) {
+    ostringstream convert;
+    for (int i = first_index; i < first_index + 4; i++) {
+        convert << (int)(ip_vector->at(i));
+        if (i < first_index+3) {
+            convert << ".";
+        }
+    }
+
+    return convert.str();
+}
+
 
 // int main() {
 
-//     uint32_t ip_1 = create_ip(192,168,0,25);
-//     uint32_t ip_2 = create_ip(192,168,0,105);
+//     vector<uint8_t> test;
+//     test.push_back(0x11);
+//     test.push_back(0x22);
+//     test.push_back(0x33);
+//     test.push_back(0x44);
+//     test.push_back(0x44);
+//     test.push_back(0x55);
 
-//     uint32_t netmask = create_ip(255,255,255,192);
 
-//     std::cout << in_subnet(ip_1, ip_2, netmask) << std::endl;
+//     cout << mac_to_string(&test,0) << endl;
 
 
 //     return 0;
