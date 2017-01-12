@@ -53,10 +53,10 @@ class Host{
         int run_DHCP_handshake();
         void host_print(std::string);
         void DHCP_client();
-        void TCP_client(const char *, uint16_t this_port, uint32_t dest_ip, uint16_t dest_port);
-        void TCP_server(const char *filename, uint16_t this_port);
-        void UDP_client(const char*, uint16_t this_port, uint32_t dest_ip, uint16_t dest_port);
-        void UDP_server(const char *filename, uint16_t this_port);
+        void TCP_client(const char *, uint16_t this_port, uint32_t dest_ip, uint16_t dest_port, Socket *);
+        void TCP_server(const char *filename, uint16_t this_port, Socket *);
+        void UDP_client(const char* filename, uint16_t this_port, uint32_t dest_ip, uint16_t dest_port, Socket *); 
+        void UDP_server(const char *filename, uint16_t this_port, Socket *);
         Socket* create_socket(uint16_t,uint8_t);         // create a socket that can be used for a specific process 
         void delete_socket(uint16_t);
         std::vector<Socket*>        open_ports; // move to smart pointers in the future

@@ -150,8 +150,11 @@ void Host::tcp_test(const char * filename, uint32_t destination_ip, uint16_t sou
     thread receiver_thread(&Host::receiver,this);
     thread mux_demux_thread(&Host::demuxer,this);
 
+
     // get an IP
     DHCP_client();
+
+    Socket * TCP_socket = create_socket(source_port, IP_PROTOCOL_TCP);
 
     // send some arps
     if (is_client) {
@@ -161,13 +164,16 @@ void Host::tcp_test(const char * filename, uint32_t destination_ip, uint16_t sou
 #endif
         
 
-        TCP_client(filename,source_port,destination_ip,destination_port);
+        TCP_client(filename,source_port,destination_ip,destination_port, TCP_socket);
     } else {
 #ifdef L4_DEBUG
         host_print("starting TCP server");
 #endif
-        TCP_server(filename,source_port);
+        TCP_server(filename,source_port, TCP_socket);
+
     }
+
+    delete_socket(TCP_socket->get_port());
 
     // let them run
     receiver_thread.join();
@@ -185,6 +191,8 @@ void Host::udp_test(const char * filename, uint32_t destination_ip, uint16_t sou
     // get an IP
     DHCP_client();
 
+    Socket * UDP_socket = create_socket(source_port, IP_PROTOCOL_UDP);
+
     // send some arps
     if (is_client) {
         // arping(destination_ip,3,DEFAULT_TIMEOUT);
@@ -192,13 +200,15 @@ void Host::udp_test(const char * filename, uint32_t destination_ip, uint16_t sou
         host_print("starting UDP client");
 #endif
 
-        UDP_client(filename,source_port,destination_ip,destination_port);
+        UDP_client(filename,source_port,destination_ip,destination_port, UDP_socket);
     } else {
 #ifdef L4_DEBUG
         host_print("starting UDP server");
 #endif
-        UDP_server(filename,source_port);
+        UDP_server(filename,source_port,UDP_socket);
     }
+
+    delete_socket(UDP_socket->get_port());
 
     receiver_thread.join();
     mux_demux_thread.join();
@@ -762,7 +772,7 @@ void Host::host_print(string statement) {
     cout << setw(15) << name << ": " << statement << endl;
 }
 
-void Host::TCP_client(const char* filename, uint16_t this_port, uint32_t dest_ip, uint16_t dest_port) {
+void Host::TCP_client(const char* filename, uint16_t this_port, uint32_t dest_ip, uint16_t dest_port, Socket * TCP_socket) {
     // create socket to send and receive segments
     MPDU * rx_frame, * tx_frame;
     TCP tx_segment, rx_segment, waiting_segment;
@@ -790,7 +800,6 @@ void Host::TCP_client(const char* filename, uint16_t this_port, uint32_t dest_ip
     host_print(to_string(segments_to_send->size()) + " segments created");
 #endif
 
-    Socket * TCP_socket = create_socket(this_port, IP_PROTOCOL_TCP);
 
     // check if the destination MAC address is known and ARP if it is not
     vector<uint8_t> dest_mac = cache.get_mac(dest_ip);
@@ -1037,7 +1046,6 @@ void Host::TCP_client(const char* filename, uint16_t this_port, uint32_t dest_ip
         }
     }
 
-    delete_socket(TCP_socket->get_port());
 
     delete segments_to_send;
 
@@ -1046,7 +1054,7 @@ void Host::TCP_client(const char* filename, uint16_t this_port, uint32_t dest_ip
 #endif
 }
 
-void Host::TCP_server(const char * filename, uint16_t this_port) {
+void Host::TCP_server(const char * filename, uint16_t this_port, Socket * TCP_socket) {
     vector<uint8_t> payload_file; // structure to hold the contents of the file being sent
     size_t payload_size = 0;
     MPDU * rx_frame, * tx_frame;
@@ -1056,11 +1064,6 @@ void Host::TCP_server(const char * filename, uint16_t this_port) {
     uint32_t last_rx_SN;
     bool connection_established = false;
     int last_payload_size = 0;
-
-
-    // create a socket to send and receive segments
-    Socket * TCP_socket = create_socket(this_port, IP_PROTOCOL_TCP);
-
 
     // listening for initial SYN
     rx_frame = TCP_socket->get_frame();
@@ -1251,15 +1254,13 @@ void Host::TCP_server(const char * filename, uint16_t this_port) {
     // save file
     ofs.close();
 
-    delete_socket(TCP_socket->get_port());
-
 #ifdef L4_DEBUG
     host_print("[TCP server] finished");
 #endif
 
 }
 
-void Host::UDP_client(const char* filename, uint16_t this_port, uint32_t dest_ip, uint16_t dest_port) {
+void Host::UDP_client(const char* filename, uint16_t this_port, uint32_t dest_ip, uint16_t dest_port, Socket* UDP_socket) {
     // UDP has no connection, so we just assume that the server is running and fire away with packets.
     // it is the responsibility of higher layers to make sure that the contents arrive without error and
     // that all missing segments are retrieved, so this should be a pretty simple implementation for now
@@ -1270,8 +1271,6 @@ void Host::UDP_client(const char* filename, uint16_t this_port, uint32_t dest_ip
     int bytes_loaded = 0;
     int next_segment_index = 0;
     // rx objects will be used later on for requesting missed segments
-
-    Socket * UDP_socket = create_socket(this_port, IP_PROTOCOL_UDP);
 
     int maximum_payload_bytes = MTU - UDP_HEADER_SIZE - IP_HEADER_SIZE - MPDU_HEADER_SIZE;
 
@@ -1343,11 +1342,9 @@ void Host::UDP_client(const char* filename, uint16_t this_port, uint32_t dest_ip
     host_print("[UDP client] file send complete, deleting socket");
 #endif
 
-    delete_socket(UDP_socket->get_port());
-
 }
 
-void Host::UDP_server(const char * filename, uint16_t this_port) {
+void Host::UDP_server(const char * filename, uint16_t this_port, Socket * UDP_socket) {
     // as mentioned with the client, this is more or less a run and receive function that will take incoming packets
     // and form the payload into a file. future implementations could work with go-back-n or selective repeat.
     // additionally, it appears as though a "stream index" is used to differentiate between different UDP flows
@@ -1358,8 +1355,6 @@ void Host::UDP_server(const char * filename, uint16_t this_port) {
     UDP rx_segment, tx_segment;
     int segment_count = 1;
     // tx objects will be used later on for requesting missed segments
-
-    Socket * UDP_socket = create_socket(this_port, IP_PROTOCOL_UDP);
 
     // open an output stream to write to a file
     ofstream ofs;
@@ -1403,9 +1398,6 @@ void Host::UDP_server(const char * filename, uint16_t this_port) {
 #ifdef L4_DEBUG
     host_print("[UDP server] file written, closing socket");
 #endif
-
-    delete_socket(UDP_socket->get_port());
-
 
 }
 

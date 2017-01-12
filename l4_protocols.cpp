@@ -4,10 +4,7 @@
 #include <cstdint>
 #include <list>
 #include "l4_protocols.h"
-// #include "addressing.h"
-// #include "data_links.h"
-// #include "l3_protocols.h"
-// #include "pdu.h"
+#include "addressing.h"
 
 using namespace std;
 
@@ -92,47 +89,6 @@ vector<UDP> * file_to_UDP_segments(const char * filename, uint16_t src_port, uin
 
     return result;
 }
-
-
-// TCPSegmentList::TCPSegmentList() {segment_list = new list<TCP>;}
-// TCPSegmentList::~TCPSegmentList() {delete segment_list;}
-
-// void TCPSegmentList::add(TCP new_segment) {
-//     //check to see if the segment isn't already in the list
-//     bool segment_exists = false;
-//     for (list<TCP>::iterator it = segment_list->begin(); it != segment_list->end(); ++it) {
-//         if((*it).sequence_number == new_segment.sequence_number) {
-//             // segment already exists, so don't add it 
-//             segment_exists = true;
-//             break;
-//         }
-//     }
-
-//     // add to the end of the list if it's not already present
-//     if (!segment_exists) {
-//         segment_list->push_back(new_segment);
-//     }
-// }
-
-
-// void TCPSegmentList::remove(TCP segment_to_remove) {
-//     // find the first matching segment and remove it from the list
-//     // NOTE: write a predicate and use remove_if. As it stands, this runs double the necessary operations
-
-//     int index = 0;
-//     bool element_found = false;
-
-//     for (list<TCP>::iterator it = segment_list->begin(); it != segment_list->end(); ++it) {
-//         if ((*it).sequence_number == segment_to_remove.sequence_number) {
-//             element_found = true;
-//             break;
-//         }
-//         index++;
-//     }
-
-//     segment_list->erase(index);
-    
-// }
 
 
 TCP generate_TCP(vector<uint8_t> tcp_u8) {
@@ -242,3 +198,4 @@ vector<TCP> * file_to_TCP_segments(const char * filename, uint16_t src_port, uin
 
     return result;
 }
+

@@ -20,6 +20,13 @@ using namespace std;
 /*
 This file acts as the driver for the network simulator, take a look at the main function for how to operate
 either a DHCP, PING, ARP, UDP or TCP test
+
+examples are 
+"./test dhcp" to run a simple retrieval of an IP address from the gateway/dhcp server
+"./test tcp tire.jpg zzz.jpg" to transfer the tire jpeg from one host to another via tcp and then have it saved as zzz.jpg
+
+- when you run, you should see the wireshark-esque printouts of what each ethernet cable is seeing
+- enabling a printout of a speicific cable is as simple as setting the input value to true and giving it a name
 */
 
 
