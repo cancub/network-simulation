@@ -93,35 +93,35 @@ uint32_t create_broadcast_ip() {
     return 0xFFFFFFFF;
 }
 
-int compare_macs(vector<uint8_t> mac1, vector<uint8_t> mac2) {
-    int result = 1;
+bool compare_macs(vector<uint8_t> mac1, vector<uint8_t> mac2) {
+    bool result = true;
     for (int i = 0; i < 6; i++){
         if (mac1[i] != mac2[i]){
-            return 0;
+            return false;
         }
     }
     return result;
 }
 
-int compare_ips(uint32_t ip1, uint32_t ip2) {
+bool compare_ips(uint32_t ip1, uint32_t ip2) {
     return ip1 == ip2;
 }
 
-int is_broadcast(vector<uint8_t> address) {
-    int result = 1;
+bool is_broadcast(vector<uint8_t> address) {
+    bool result = true;
     for(int i = 0; i < 6; i++) {
         if (address[i] != 0xFF) {
-            return 0;
+            return false;
         }
     }
     return result;
 }
 
-int is_broadcast(uint32_t address) {
+bool is_broadcast(uint32_t address) {
     return address == 0xFFFFFFFF;
 }
 
-int in_subnet(uint32_t ip_1,uint32_t ip_2, uint32_t test_netmask) {
+bool in_subnet(uint32_t ip_1,uint32_t ip_2, uint32_t test_netmask) {
     // roll through each of the bits of the netmask
     for (int i = 0; i < 32; i++){
         // check to see if this bit is 1 in the netmask, meaning
@@ -130,12 +130,12 @@ int in_subnet(uint32_t ip_1,uint32_t ip_2, uint32_t test_netmask) {
         if ((test_netmask >> i) & 0x01){
             if (!(((ip_1 >> i) &  0x01) == ((ip_2 >> i) & 0x01))) {
                 // if this is not true, then the address isn't in the same subnet
-                return 0;
+                return false;
             }
         }
     }
 
-    return 1;
+    return true;
 }   
 
 string mac_to_string(vector<uint8_t> mac_addr){

@@ -5,9 +5,9 @@
 #include <vector>
 #include <mutex>
 #include <cstdint>
+#include <condition_variable> // std::condition_variable
 #include "frame_generators.h"
 #include "pdu.h"
-#include <condition_variable> // std::condition_variable
 #include "data_links.h"
 #include "l3_protocols.h"
 
@@ -21,12 +21,13 @@ links and read frames.
 class Host{
     public:
         Host(); // default constructor
-        Host(uint32_t, std::vector<uint8_t>, std::string, mutex*); // IP, MAC, and name (like "alice")
+        Host(std::vector<uint8_t>, std::string, mutex*); // IP, MAC, and name (like "alice")
         // Host(std::string, std::string, std::string, std::mutex*, MPDU*); // same as above but with a
                                                                             // mutex and interface
         ~Host();
         void arp_test(uint32_t, int);
         void ping_test(uint32_t, int, int delay = 0);
+        void dhcp_test();
         void tcp_test(const char *, uint32_t, uint16_t, uint16_t, int); // start sending frames to the specified MAC address
         void udp_test(const char *, uint32_t, uint16_t, uint16_t, int); // start sending frames to the specified MAC address
         uint32_t get_ip();
@@ -51,6 +52,7 @@ class Host{
         void receive_arp(std::vector<uint8_t>);
         int run_DHCP_handshake();
         void host_print(std::string);
+        void DHCP_client();
         void TCP_client(const char *, uint16_t this_port, uint32_t dest_ip, uint16_t dest_port);
         void TCP_server(const char *filename, uint16_t this_port);
         void UDP_client(const char*, uint16_t this_port, uint32_t dest_ip, uint16_t dest_port);

@@ -62,10 +62,12 @@ void MPDU::encap_SDU(IP new_IP) {
     // set the type since we know it's IP
     SDU_type = 0x0800;
 
+
+
     // and since we know it's IP, we know what the headers are and how much space they
     // take up, so we can copy the contents, byte by byte into the SDU (since the 
     // data link layer should be agnostic to the L2 frame payload contents)
-
+    SDU.clear();
     SDU.reserve(new_IP.get_total_length());
 
     // header length 1 byte

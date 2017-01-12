@@ -8,17 +8,18 @@
 #include <cstdio> // HOST_HOST_EOF
 #include <string>
 #include <chrono> // fine grained timing
-#include "host.h"
-#include "frame_generators.h"
-#include "pdu.h"
+#include <fstream>
 #include <iomanip>
 #include <cstdint>
+#include "host.h"
+#include "frame_generators.h"
+#include "networking_devices.h"
+#include "pdu.h"
 #include "data_links.h"
 #include "addressing.h"
 #include "l3_protocols.h"
 #include "l4_protocols.h"
 #include "md5.h"
-#include <fstream>
 
 using namespace std;
 
@@ -31,6 +32,7 @@ using namespace std;
 
 // #define DEBUG
 // #define L4_DEBUG
+// #define DHCP_DEBUG
 // #define ARP_DEBUG
 // #define TEST_SENDING
 // #define FRAME_TIMES
@@ -49,11 +51,10 @@ Host::Host() {
 #endif
 }
 
-Host::Host(uint32_t ip_addr, vector<uint8_t> mac_addr, string hostname, mutex* stop_m) {
+Host::Host(vector<uint8_t> mac_addr, string hostname, mutex* stop_m) {
 
     srand (time(NULL));
-
-    ip = ip_addr;
+    
     mac = mac_addr;
     rx_frame_count = 0;
     name = hostname;
@@ -77,6 +78,9 @@ void Host::arp_test(uint32_t dest_ip, int number_of_arps) {
     thread receiver_thread(&Host::receiver,this);
     thread mux_demux_thread(&Host::demuxer,this);
 
+    // get an IP
+    DHCP_client();
+
     // send some arps
     if (!is_broadcast(dest_ip)) {
 #ifdef DEBUG
@@ -88,6 +92,7 @@ void Host::arp_test(uint32_t dest_ip, int number_of_arps) {
     // let them run
     receiver_thread.join();
     mux_demux_thread.join();
+
 }
 
 void Host::ping_test(uint32_t destination_ip, int number_of_pings, int delay) {
@@ -96,7 +101,11 @@ void Host::ping_test(uint32_t destination_ip, int number_of_pings, int delay) {
     thread receiver_thread(&Host::receiver,this);
     thread mux_demux_thread(&Host::demuxer,this);
 
+    // get an IP
+    DHCP_client();
+
     usleep(delay);
+
 
     // send some arps
     if (!is_broadcast(destination_ip)) {
@@ -106,13 +115,32 @@ void Host::ping_test(uint32_t destination_ip, int number_of_pings, int delay) {
 #endif
         ping(destination_ip,number_of_pings);
 
-
-        unique_lock<mutex> lck(*m_mutex);
     }
 
     // let them run
     receiver_thread.join();
     mux_demux_thread.join();
+}
+
+
+void Host::dhcp_test() {
+
+    // make the threads for receiving and demuxing/sending
+    thread receiver_thread(&Host::receiver,this);
+    thread mux_demux_thread(&Host::demuxer,this);
+
+    // arping(destination_ip,3,DEFAULT_TIMEOUT);
+#ifdef DEBUG
+    host_print("Getting IP");
+#endif
+
+
+    DHCP_client();
+
+
+    receiver_thread.join();
+    mux_demux_thread.join();
+
 }
 
 void Host::tcp_test(const char * filename, uint32_t destination_ip, uint16_t source_port, uint16_t destination_port, 
@@ -121,6 +149,9 @@ void Host::tcp_test(const char * filename, uint32_t destination_ip, uint16_t sou
     // make the threads for receiving and demuxing/sending
     thread receiver_thread(&Host::receiver,this);
     thread mux_demux_thread(&Host::demuxer,this);
+
+    // get an IP
+    DHCP_client();
 
     // send some arps
     if (is_client) {
@@ -141,6 +172,7 @@ void Host::tcp_test(const char * filename, uint32_t destination_ip, uint16_t sou
     // let them run
     receiver_thread.join();
     mux_demux_thread.join();
+
 }
 
 void Host::udp_test(const char * filename, uint32_t destination_ip, uint16_t source_port, uint16_t destination_port, 
@@ -149,6 +181,9 @@ void Host::udp_test(const char * filename, uint32_t destination_ip, uint16_t sou
     // make the threads for receiving and demuxing/sending
     thread receiver_thread(&Host::receiver,this);
     thread mux_demux_thread(&Host::demuxer,this);
+
+    // get an IP
+    DHCP_client();
 
     // send some arps
     if (is_client) {
@@ -165,15 +200,9 @@ void Host::udp_test(const char * filename, uint32_t destination_ip, uint16_t sou
         UDP_server(filename,source_port);
     }
 
-    // let them run
-#ifdef L4_DEBUG
-        host_print("joining receiver");
-#endif
     receiver_thread.join();
-#ifdef L4_DEBUG
-        host_print("joining mux_demux_thread");
-#endif
     mux_demux_thread.join();
+
 }
 
 uint32_t Host::get_ip() {return ip;}
@@ -420,7 +449,7 @@ void Host::ping(uint32_t destination_ip, int count) {
     ip_to_send.set_source_ip(ip);
 
     // create a socket that will be used to send 
-    Socket* icmp_socket = create_socket(0, IP_PROTOCOL_ICMP);
+    Socket* icmp_socket = create_socket(7, IP_PROTOCOL_ICMP);
 
     MPDU* rx_frame;
 
@@ -617,6 +646,7 @@ Socket* Host::create_socket(uint16_t requested_port_number = 1, uint8_t protocol
         do
         {   
             for (vector<Socket*>::iterator it = open_ports.begin(); it != open_ports.end(); ++it) {
+
                 if ((*it)->get_port() == test_port_number) {
                     // the port number has already been taken, so see if the next value works
                     port_found = 0;
@@ -1376,5 +1406,149 @@ void Host::UDP_server(const char * filename, uint16_t this_port) {
 
     delete_socket(UDP_socket->get_port());
 
+
+}
+
+void Host::DHCP_client() {
+    MPDU* tx_frame, *rx_frame;
+    vector<uint8_t> SDU;
+    IP rx_packet, tx_packet;
+    UDP rx_segment, tx_segment;
+    DHCP rx_message, tx_message;
+
+    // create a socket specifically for dhcp, which should be on the DHCP client port
+    Socket* dhcp_socket = create_socket(BOOTP_CLIENT_PORT, IP_PROTOCOL_UDP);
+
+
+    // generate a DHCP object
+    tx_message.opcode = DHCP_DISCOVER;
+    tx_message.client_ip = create_ip(0,0,0,0);
+
+    // encap in UDP
+    tx_segment.source_port = BOOTP_CLIENT_PORT;
+    tx_segment.destination_port = BOOTP_SERVER_PORT;
+    tx_segment.payload.push_back(tx_message.opcode);
+    for (int i = 3; i >= 0; i--) {
+        tx_segment.payload.push_back((tx_message.client_ip >> (i*8)) & 0xFF);
+    }
+    for (int i = 3; i >= 0; i--) {
+        tx_segment.payload.push_back((tx_message.your_ip >> (i*8)) & 0xFF);
+    }
+
+    // encap in IP
+
+    tx_packet.set_source_ip(tx_message.client_ip);
+    tx_packet.set_destination_ip(create_broadcast_ip());
+    tx_packet.encap_SDU(tx_segment);
+
+    // encap in MPDU
+
+    tx_frame = new MPDU();
+    tx_frame->set_source_mac(mac);
+    tx_frame->set_destination_mac(create_broadcast_mac());
+    tx_frame->encap_SDU(tx_packet);
+
+    // send frame
+
+    send_MPDU(tx_frame);
+
+    // wait on the return frame and keep looping until we get the offer
+    while (true) {
+        rx_frame = dhcp_socket->get_frame();
+        rx_packet = generate_IP(rx_frame->get_SDU());
+        rx_segment = generate_UDP(rx_packet.get_SDU());
+        if (rx_segment.source_port == BOOTP_SERVER_PORT) {
+#ifdef DHCP_DEBUG
+            host_print("Got DHCP frame");
+#endif
+            rx_message = generate_DHCP(rx_segment.payload);
+            if (rx_message.opcode == DHCP_OFFER) {
+#ifdef DHCP_DEBUG
+                host_print("Got DHCP offer, sending request");
+#endif
+                delete rx_frame;
+                break;
+            }
+#ifdef DHCP_DEBUG
+            host_print("Got other DHCP, opcode: " + to_string(rx_message.opcode));
+#endif 
+        } else {
+            // we don't have anything else to do with this frame at the moment
+            tx_frame = new MPDU();
+            tx_frame->set_source_mac(mac);
+            tx_frame->set_destination_mac(create_broadcast_mac());
+            tx_frame->encap_SDU(tx_packet);
+            send_MPDU(tx_frame);
+        }
+        delete rx_frame;
+    }
+
+    // set and send the request frame
+    tx_message.opcode = DHCP_REQUEST;
+    tx_message.client_ip = rx_message.your_ip;
+    tx_message.your_ip = rx_message.your_ip;
+
+    // encap in UDP
+    tx_segment.payload.clear();
+    tx_segment.payload.push_back(tx_message.opcode);
+    for (int i = 3; i >= 0; i--) {
+        tx_segment.payload.push_back((tx_message.client_ip >> (i*8)) & 0xFF);
+    }
+    for (int i = 3; i >= 0; i--) {
+        tx_segment.payload.push_back((tx_message.your_ip >> (i*8)) & 0xFF);
+    }
+
+    // encap in IP
+
+    // tx_packet.set_source_ip(create_ip(0,0,0,0));
+    // tx_packet.set_destination_ip(create_broadcast_ip());
+    tx_packet.encap_SDU(tx_segment);
+
+    // encap in MPDU
+
+    tx_frame = new MPDU();
+    tx_frame->set_source_mac(mac);
+    tx_frame->set_destination_mac(create_broadcast_mac());
+    tx_frame->encap_SDU(tx_packet);
+
+    send_MPDU(tx_frame);
+
+
+    // wait on the return frame and keep looping until we get the ACK
+    while (true) {
+        rx_frame = dhcp_socket->get_frame();
+        rx_packet = generate_IP(rx_frame->get_SDU());
+        rx_segment = generate_UDP(rx_packet.get_SDU());
+        if (rx_segment.source_port == BOOTP_SERVER_PORT) {
+#ifdef DHCP_DEBUG
+            host_print("Got DHCP frame");
+#endif
+            rx_message = generate_DHCP(rx_segment.payload);
+            if (rx_message.opcode == DHCP_ACK) {
+#ifdef DHCP_DEBUG
+                host_print("Got DHCP ACK, setting IP");
+#endif
+                ip = rx_message.your_ip; 
+                delete rx_frame;               
+                break;
+            }
+#ifdef DHCP_DEBUG
+            host_print("Got other DHCP, opcode: " + to_string(rx_message.opcode));
+#endif            
+        } else {
+            // resend the request
+            tx_frame = new MPDU();
+            tx_frame->set_source_mac(mac);
+            tx_frame->set_destination_mac(create_broadcast_mac());
+            tx_frame->encap_SDU(tx_packet);
+        }
+        delete rx_frame;
+    }
+
+#ifdef DHCP_DEBUG
+            host_print("IP: " + ip_to_string(ip));
+#endif  
+
+    delete_socket(dhcp_socket->get_port());
 
 }
