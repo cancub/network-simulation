@@ -17,7 +17,7 @@
 using namespace std;
 
 Socket::Socket(uint16_t port_number, uint8_t protocol_number) {
-    rx_queue = new wqueue<MPDU*>("", false);
+    rx_queue = new wqueue<MPDU*>;
     port = port_number;
     protocol = protocol_number;
 }

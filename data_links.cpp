@@ -17,7 +17,7 @@ EthernetWire::EthernetWire(chrono::time_point<chrono::high_resolution_clock> sta
     int* fc_ptr) {
     //initialize a queue as the interface and set the maximum size of the queue to however
     // many frames this interface can hold (in this case 1)
-    interface = new wqueue<MPDU*>("",false);
+    interface = new wqueue<MPDU*>;
     interface->set_max_size(1);
     link_start_time = start_time;
     print_metadata = monitor;

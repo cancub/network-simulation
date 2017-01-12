@@ -44,7 +44,6 @@ vector<UDP> * file_to_UDP_segments(const char * filename, uint16_t src_port, uin
     vector<UDP> * result = new vector<UDP>();
 
     vector<uint8_t> file;
-    bool EOF_reached = false;
     ifstream ifs;
     ifs.open (filename, ifstream::in);
     char c = ifs.get();
@@ -59,6 +58,8 @@ vector<UDP> * file_to_UDP_segments(const char * filename, uint16_t src_port, uin
 
     int bytes_loaded = 0;
 
+    // cout << "number of segments = " << ((file.size() / maximum_bytes) + 1) << endl;
+
     UDP tx_segment;
     tx_segment.source_port = src_port;
     tx_segment.destination_port = dest_port;
@@ -72,15 +73,15 @@ vector<UDP> * file_to_UDP_segments(const char * filename, uint16_t src_port, uin
     }
 
     // load bytes into the payload
-    while (!EOF_reached) {
+    while (true) {
         // load a byte into the payload
         tx_segment.payload.push_back(file[bytes_loaded++]);
         // go until either the maximum number of bytes have been loaded or the last byte of the
         // file has been loaded
         if (bytes_loaded == file.size()) {
             // this will be the last segment sent, because we have run out of data to send
-            EOF_reached = true;
-
+            tx_segment.payload.push_back(SEGMENT_EOF);
+            result->push_back(tx_segment);
             break;
         } else if (tx_segment.payload.size() == maximum_bytes) {
             // there will be more data to send, but there's no more room in the segment to send it
@@ -200,11 +201,10 @@ vector<TCP> * file_to_TCP_segments(const char * filename, uint16_t src_port, uin
     TCP tx_segment;
     tx_segment.source_port = src_port;
     tx_segment.destination_port = dest_port;
+
     tx_segment.sequence_number = 1; // these values for SN and ACK_N come from a successful three-way handshake
     tx_segment.ACK_number = 1;
     tx_segment.details = TCP_ACK;
-
-    cout << file.size() / maximum_bytes << endl;
 
     while (!(tx_segment.details & TCP_FIN)) {
 
@@ -236,18 +236,9 @@ vector<TCP> * file_to_TCP_segments(const char * filename, uint16_t src_port, uin
         if (result->size() > 0) {
             tx_segment.sequence_number = result->back().sequence_number + result->back().payload.size();
         }
-        // cout << "adding, SN = " << tx_segment.sequence_number << endl;
 
         result->push_back(tx_segment);
     }
 
     return result;
 }
-
-// int main() {
-//     cout << TCP_SYN << endl;
-//     cout << TCP_ACK << endl;
-//     cout << TCP_FIN << endl;
-//     cout << TCP_SYNACK << endl;
-//     cout << TCP_FINACK << endl;
-// }

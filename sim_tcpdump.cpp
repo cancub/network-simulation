@@ -44,21 +44,27 @@ string *  get_frame_details(MPDU* tx_frame) {
 							break;
 					}
 					temp +="id=" + to_string((payload[IP_HEADER_SIZE + 4] < 8) + payload[IP_HEADER_SIZE + 5]) + ", seq=" +
-							to_string((payload[IP_HEADER_SIZE + 6] < 8) + payload[IP_HEADER_SIZE + 7]) + "\"";
+							to_string((payload[IP_HEADER_SIZE + 6] < 8) + payload[IP_HEADER_SIZE + 7]) + "\""; 
 					break;
 				case IP_PROTOCOL_TCP:
 					temp += " TCP " + to_string(tx_frame->get_size()) + "\t\"";
-					temp += to_string((payload[IP_HEADER_SIZE] < 8) + payload[IP_HEADER_SIZE + 1]) + "->" + 
-							to_string((payload[IP_HEADER_SIZE+2] < 8) + payload[IP_HEADER_SIZE + 3]) + " ";
-					temp += "Seq=" + to_string((payload[IP_HEADER_SIZE +4] < 24) + (payload[IP_HEADER_SIZE + 5] < 16) +
-						(payload[IP_HEADER_SIZE + 6] < 8) + payload[IP_HEADER_SIZE + 7]) + "\t";
-					temp += "Ack=" + to_string((payload[IP_HEADER_SIZE +8] < 24) + (payload[IP_HEADER_SIZE + 9] < 16) +
-						(payload[IP_HEADER_SIZE + 10] < 8) + payload[IP_HEADER_SIZE + 11]) + "\"";
+					// cout << to_string(payload[IP_HEADER_SIZE] << 8) << " " << to_string(payload[IP_HEADER_SIZE + 1]) << endl;
+					temp += to_string((payload[IP_HEADER_SIZE] << 8) + payload[IP_HEADER_SIZE + 1]) + "->" + 
+							to_string((payload[IP_HEADER_SIZE+2] << 8) + payload[IP_HEADER_SIZE + 3]) + " ";
+					temp += "Seq=" + to_string(((uint32_t)(payload[IP_HEADER_SIZE +4]) << 24) + 
+						((uint32_t)(payload[IP_HEADER_SIZE + 5]) << 16) +
+						((uint32_t)(payload[IP_HEADER_SIZE + 6]) << 8) + 
+						payload[IP_HEADER_SIZE + 7]) + "\t";
+					temp += "Ack=" + to_string(((uint32_t)(payload[IP_HEADER_SIZE +8]) << 24) + 
+						((uint32_t)(payload[IP_HEADER_SIZE + 9]) << 16) +
+						((uint32_t)(payload[IP_HEADER_SIZE + 10]) << 8) + 
+						payload[IP_HEADER_SIZE + 11]) + "\"";
 					break;
 				case IP_PROTOCOL_UDP:
 					temp += " UDP " + to_string(tx_frame->get_size()) + "\t\"";
-					temp += "Source port: " + to_string((payload[IP_HEADER_SIZE] < 8) + payload[IP_HEADER_SIZE + 1]) + " ";
-					temp += "Destination port: " + to_string((payload[IP_HEADER_SIZE+ 2] < 8) + 
+					// cout << to_string(((uint32_t)(payload[IP_HEADER_SIZE])) << 8) << " " << to_string(payload[IP_HEADER_SIZE + 1]) << endl;
+					temp += "Source port: " + to_string((payload[IP_HEADER_SIZE] << 8) + payload[IP_HEADER_SIZE + 1]) + " ";
+					temp += "Destination port: " + to_string((payload[IP_HEADER_SIZE+ 2] << 8) + 
 							payload[IP_HEADER_SIZE + 3]) + "\"";
 					break;
 			}

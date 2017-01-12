@@ -176,7 +176,7 @@ void test_print(const char* statement) {
     cout << " *******" << endl;
 }
 
-void test(int test_num) {
+void test(int test_num, char * if_name, char * of_name) {
     // create the condition variables that will allow us to wait for the completion of the client threads
     // and then shut down the server and switch threads
     mutex * sw_mutex = new mutex;
@@ -206,7 +206,7 @@ void test(int test_num) {
 
     // create the two Ethernet links necessary to run the test
     EthernetLink * EL1 = new EthernetLink(true, "A-S"); //monitor the interface between alice and switch
-    EthernetLink * EL2 = new EthernetLink(true, "B-S");
+    EthernetLink * EL2 = new EthernetLink(false, "B-S");
 
     // plug in the hosts to the switch
     test_print("Plugging in hosts");
@@ -238,16 +238,16 @@ void test(int test_num) {
         case TCP_TEST:
             // run alice as the server
             test_print("Sending file via TCP");
-            alice_thread = new thread(&Host::tcp_test, alice, bob_ip, alice_port,bob_port, 0); 
+            alice_thread = new thread(&Host::tcp_test, alice, of_name, bob_ip, alice_port,bob_port, 0); 
             // run bob as the client
-            bob_thread = new thread(&Host::tcp_test, bob, alice_ip, bob_port, alice_port, 1);
+            bob_thread = new thread(&Host::tcp_test, bob, if_name, alice_ip, bob_port, alice_port, 1);
             break;
         case UDP_TEST:
             test_print("Sending file via UDP");
             // run alice as the server
-            alice_thread = new thread(&Host::udp_test, alice, bob_ip, alice_port,bob_port, 0);
+            alice_thread = new thread(&Host::udp_test, alice, of_name, bob_ip, alice_port,bob_port, 0);
             // run bob as the client
-            bob_thread = new thread(&Host::udp_test, bob, alice_ip, bob_port, alice_port, 1);
+            bob_thread = new thread(&Host::udp_test, bob, if_name, alice_ip, bob_port, alice_port, 1);
             break;
     }
 
@@ -273,18 +273,26 @@ void test(int test_num) {
 
 int main(int argc, char *argv[]) {
 
-    if (argc != 2) {
+    if (argc < 2) {
         cout << "Testing requires one argument from [arp, ping, tcp, udp]" << endl;
     } else {
         string argv1 = argv[1];
         if (argv1 == "arp") {
-            test(ARP_TEST);
+            test(ARP_TEST, NULL, NULL);
         } else if (argv1 == "ping") {
-            test(PING_TEST);
+            test(PING_TEST, NULL, NULL);
         } else if (argv1 == "tcp") { 
-            test(TCP_TEST);
+            if (argc != 4) {
+                cout << "TCP requires a filename of a file in the same folder and an output filename"  << endl;               
+            } else {              
+                test(TCP_TEST, argv[2], argv[3]); 
+            }
         } else if (argv1 == "udp"){
-            test(UDP_TEST);
+            if (argc != 4) {
+                cout << "UDP requires a filename of a file in the same folder and an output filename"  << endl;               
+            } else {              
+                test(UDP_TEST, argv[2], argv[3]); 
+            }
         } else {
             cout << "Testing requires one argument from [arp, ping, tcp, udp]" << endl;
         }

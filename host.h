@@ -27,8 +27,8 @@ class Host{
         ~Host();
         void arp_test(uint32_t, int);
         void ping_test(uint32_t, int, int delay = 0);
-        void tcp_test(uint32_t, uint16_t, uint16_t, int); // start sending frames to the specified MAC address
-        void udp_test(uint32_t, uint16_t, uint16_t, int); // start sending frames to the specified MAC address
+        void tcp_test(const char *, uint32_t, uint16_t, uint16_t, int); // start sending frames to the specified MAC address
+        void udp_test(const char *, uint32_t, uint16_t, uint16_t, int); // start sending frames to the specified MAC address
         uint32_t get_ip();
         std::vector<uint8_t> get_mac();
         int get_frame_count();

@@ -21,6 +21,10 @@ using namespace std;
 #define TCP_HEADER_SIZE 18
 #define UDP_HEADER_SIZE 8
 
+
+
+#define SEGMENT_EOF 0xFF
+
 //  layer 4 types
 
 // 	UDP

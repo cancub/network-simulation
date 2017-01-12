@@ -12,6 +12,7 @@
 #include "wqueue.h"
 #include "addressing.h"
 #include <ctime>
+#include "unistd.h"
 
 /*
 This switch class is for conencting to other switches and hosts for relaying frames.
@@ -26,7 +27,7 @@ using namespace std;
 
 #define NUMBER_OF_INTERFACES 10      // the assumed number of physical interfaces the switch has 
 
-#define DEBUG
+// #define DEBUG
 
 Switch::Switch() {
     rx_interfaces.reserve(NUMBER_OF_INTERFACES);
@@ -127,7 +128,7 @@ void Switch::unicast(MPDU* tx_frame, int if_id) {
 #ifdef DEBUG
     switch_print("Transmitting frame on interface " + std::to_string(if_id));
 #endif
-
+    usleep((rand() % 1000) + 100);
     // will block until that interface is free
     tx_interfaces.at(if_id)->transmit(tx_frame);
 }
@@ -158,6 +159,7 @@ void Switch::receiver(int if_id) {
 #ifdef DEBUG
         switch_print("Frame received on interface " + std::to_string(if_id));
 #endif
+        usleep((rand() % 1000) + 100);
         process_frame(rx_frame, if_id);
     }
 }
