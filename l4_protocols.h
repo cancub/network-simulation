@@ -2,10 +2,13 @@
 #define L4_PROTOCOLS_H
 
 #include <vector>
-#include <list>
+#include <iostream>
+#include <fstream>
 #include <cstdint>
-// #include "pdu.h"
-// #include "data_links.h"
+#include <list>
+#include "pdu.h"
+#include "addressing.h"
+#include "data_links.h"
 
 using namespace std;
 
@@ -38,8 +41,10 @@ struct UDP {
 };
 
 UDP generate_UDP(vector<uint8_t> udp_u8);
+vector<UDP> * file_to_UDP_segments(const char * , uint16_t , uint16_t , int );
+void UDP_client(const char* , uint16_t , uint32_t , uint16_t , Socket * ,EthernetWire* );
+void UDP_server(const char * , uint16_t , Socket * , EthernetWire* );
 
-vector<UDP> * file_to_UDP_segments(const char * filename, uint16_t src_port, uint16_t dest_port, int maximum_bytes);
 
 // TCP
 
@@ -54,22 +59,10 @@ struct TCP {
 	vector<uint8_t> payload;
 };
 
-// class TCPSegmentList {
-// public:
-// 	TCPSegmentList();
-// 	~TCPSegmentList();
-// 	void add(TCP);
-// 	void remove(TCP);
-// 	void pop_front() {segment_list.pop_front();}
-// 	TCP front() {return segment_list.front();}
-// 	size_t size() {return segment_list.size();}
-// private:
-// 	list<TCP> segment_list;
-// }
-
 TCP generate_TCP(vector<uint8_t> tcp_u8);
-
-vector<TCP> * file_to_TCP_segments(const char *, uint16_t src_port, uint16_t dest_port, int maximum_bytes);
+vector<TCP> * file_to_TCP_segments(const char *, uint16_t , uint16_t , int );
+void TCP_server(const char *, uint16_t, Socket *, EthernetWire *);
+void TCP_client(const char* , uint16_t , uint32_t , uint16_t , Socket* ,EthernetWire* );
 
 // MPDU* TCP_to_MPDU();
 
